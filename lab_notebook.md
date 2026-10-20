@@ -1,5 +1,26 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 6: figure renderer
+
+### Summary
+Added `src/scene.js` (first DOM module) exporting `createScene(svg)` -> `{ render(s) }`; `render` clears the svg and redraws everything from `s = {r, t, peak}` (plus `derive(s)`), so it is idempotent. Put `'scene.js'` after `'layout.js'` in `MODULES` (`build.js`). Replaced the stub in `src/app.js` with a temporary `createScene(document.getElementById('fig')).render(createState().getState())` (Task 7 replaces it). Draws the top figure (dashed rectangle and triangle at 20 % fill, 8 net-load arrows, beam copy, dimension line with `AB = 2 m (loaded)` / dimmer `BC = 2 m (no load)`, text block at `TOP.textX`) and three columns (beam copy, `forceArrow` arrow, three text lines at `COLS.textY`). Suite 70/70 (no new tests: nothing here can run without a DOM); `dist/` rebuilt. Not opened in a browser (the controller does that).
+
+### Decisions made
+- All positions and lengths come from `layout.js`; scene.js holds only drawing style (`SCENE_*` constants: text size 16, dash `5 3`, fill opacity 0.2, wall 14 wide / 18 over, 4 hatches, circle radius `BEAM_H/2`, arrow head cap 9). Helper names are `scene*` to stay unique in the shared scope.
+- Every `text()` call passes size 16 (letters 16 bold); class `t` (letters `tin`) is set on the node after creation. Graphics carry `g`; wall and hatching also `wall`; circles also `pc`; arrows are `<g class="g">` (shaft line + head path). Letters have no halo; circle fill is white.
+- `Triangular: peak N N/m at B` is always over 24 characters (27+), so it is always split into `Triangular:` and `peak 100 N/m at B`, and the `(+ down, − up)` note moves from +38 to +60 (the five-line block spans beamY-28 .. beamY+60, clear of the dimension line at 206).
+- Zero cases: column line 2 `0 N`, line 3 `no load of this kind`; Combined says `the parts cancel: no single force` when `derive().couple`, else `no load` (both loads zero). No arrow when `forceArrow` is null.
+- Draw order: load shapes, net arrows, beam copy, dimension line; in columns beam first, then arrow, so the head is on top of the beam face.
+- Sanity check outside the repo: a throwaway stub-DOM script (kept in the scratchpad, not committed, not a test) rendered five states twice each without exceptions; every text has a class and size >= 16; default text strings match the mockup (200 N at 1, 100 N at 1.33, 300 N at 1.11).
+
+### Problems encountered
+- `fmt` drops trailing zeros (`Number(n.toFixed(2))`), so the default locations print `at x = 1 m from A` and `at x = 1.11 m from A`, not `1.00`. That is existing `format.js` behaviour pinned by its tests; left unchanged.
+
+### Open questions / next steps
+- Controller: open `dist/distributed_load_beam.html` and check overlap/clipping (longest column line is `at x = N m from A (off the beam)` for a combined force far off the beam; column pitch is 310 units).
+- Task 7 replaces the temporary render in `app.js` with the real app and subscribes `render` to the state.
+- Sources: design `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; mockup `docs/superpowers/specs/2026-10-20-distributed-load-mockup.html` (`draw()`); plan `docs/superpowers/plans/2026-10-20-distributed-load-beam.md` (Task 6).
+
 ## 2026-10-20 - Task 5: figure geometry (pure)
 
 ### Summary
