@@ -1,5 +1,21 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 8 fix round 1 (b): harness checks arrow vs wall, a real budget, more probes
+
+### Summary
+`tools/browser-harness.js` (249 lines): check (8) top-level arrow groups vs `.wall` elements (0.5 tolerance); `checkFigure` now returns `{ violations, minPx, nTexts, nG }` and flags fewer than 20 texts or 20 top-level `.g` (vacuity floors, also reported by `sweep` as `minTexts`/`minGs`); `sweep` and `sensitivity` restore the defaults in `finally`. `sensitivity` plants four probes: PROBE1 inside the beam where nothing else is (must produce exactly one violation, naming the one `rect.g` that contains it, compared by its bbox string), PROBE2 on an existing label, PROBE3 at x = 950 (past 960), PROBE4 at font-size 10; returns `beamCaught, textCaught, clipCaught, smallCaught, cleanAfter, flagged`. `budget` was near-vacuous because the controls row is `position: sticky; bottom: 0` (its rect bottom is clamped to the viewport): `ok` now also needs `scrollHeight <= innerHeight`, zero rect intersection of `.side`, `#controls` and `#calc` with `#fig`, neither `#controls` nor `#calc` clipped (`scrollHeight <= clientHeight + 1`), and hscroll uses `documentElement.clientWidth`; all numbers are in the result.
+
+### Decisions made
+- Floors are 20 texts (text.t + text.tin; the minimum real figure has 21) and 20 top-level `.g`.
+- The beam probe sits at x = 500, baseline 108: past the loaded half and between B and C, so no load shape, arrow, circle or label shares its box.
+
+### Problems encountered
+- None new; validated against the stub DOM only (no browser): wall check fires on an arrow group on the wall, budget intersection and clipped flags flip as expected, sensitivity flagged true on the stub.
+
+### Open questions / next steps
+- Controller re-runs the harness at 1280x720, 800x750, 1000x700 (the page must fit without scrolling at all three now).
+- Source: the finding list in the Task 8 fix-round message.
+
 ## 2026-10-20 - Task 8 fix round 1 (a): no force arrow over the wall
 
 ### Summary

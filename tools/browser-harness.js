@@ -19,9 +19,13 @@
 //                pointer-style input) and the peak buttons, over the 9x9 grid of r,t x both
 //                peaks plus the near-cancel sets, and after each state runs checkFigure.
 //                It also checks the drive worked (slider values, readouts, pressed button).
-//   sensitivity  plants a text on the beam and a text on another text, and requires
-//                checkFigure to name both: proves the sweep can see an overlap at all.
-//   budget       figure, controls and calculation bottoms <= innerHeight, no horizontal scroll.
+//   sensitivity  plants four texts: one on the beam (and only the beam), one on another text,
+//                one past the viewBox edge, one at font-size 10; requires checkFigure to name
+//                each, and a clean figure after removal: proves the checker can see each fault.
+//   budget       the page fits (scrollHeight <= innerHeight), the sticky controls row does not
+//                cover the figure, #controls and #calc show all their content, bottoms <=
+//                innerHeight, no horizontal scroll. (The row is position: sticky; bottom: 0, so a
+//                bottom <= innerHeight alone proves nothing: its rect is clamped to the viewport.)
 (function () {
   const VB = { w: 960, h: 560 };
   const TOL = 0.5;           // overlap counts only if the intersection exceeds this in x AND y
@@ -31,6 +35,7 @@
   const NEAR_CANCEL = [[100, -190], [100, -195], [100, -200], [-100, 190], [-100, 195], [-100, 200]];
   const DEFAULTS = { r: 100, t: 100, peak: 'B' };
   const EXPECTED_COMBOS = 9 * 9 * 2 + 6 * 2;
+  const MIN_TEXTS = 20, MIN_GS = 20;   // non-vacuity floors: a checker that finds nothing to measure proves nothing
 
   let fig = null, ui = null;
 
@@ -66,7 +71,8 @@
     : `<${el.tagName}${el.getAttribute('class') ? '.' + el.getAttribute('class').replace(/\s+/g, '.') : ''}> @${r1(b.x0)},${r1(b.y0)}-${r1(b.x1)},${r1(b.y1)}`;
   const topLevelG = () => Array.from(fig.querySelectorAll('.g')).filter(e => !e.parentElement.closest('.g'));
 
-  // Every geometry rule in one place; used by sweep and sensitivity. Returns violation strings.
+  // Every geometry rule in one place; used by sweep and sensitivity.
+  // Returns { violations: string[], minPx, nTexts, nG }.
   function checkFigure(tag) {
     const out = [];
     const bad = (msg) => out.push(`${tag}: ${msg}`);
@@ -74,6 +80,7 @@
     const tins = Array.from(fig.querySelectorAll('text.tin')).map(el => ({ el, b: box(el) }));
     const gs = topLevelG().map(el => ({ el, b: box(el) }));
     const pcs = gs.filter(g => g.el.classList.contains('pc'));
+    const walls = gs.filter(g => g.el.classList.contains('wall'));
     const arrows = gs.filter(g => !g.el.classList.contains('pc') && !g.el.classList.contains('wall') &&
       g.el.tagName === 'g' && g.el.firstElementChild && g.el.firstElementChild.tagName === 'line');
 
@@ -91,6 +98,11 @@
       if (hits(a.b, c.b)) bad(`${name(a.el, a.b)} overlaps circle ${name(c.el, c.b)}`);
     }
     for (const g of gs) if (outside(g.b)) bad(`${name(g.el, g.b)} outside the viewBox`);                         // 6
+    for (const a of arrows) for (const w of walls) {                                                             // 8
+      if (hits(a.b, w.b)) bad(`${name(a.el, a.b)} overlaps wall ${name(w.el, w.b)}`);
+    }
+    if (texts.length + tins.length < MIN_TEXTS) bad(`only ${texts.length + tins.length} texts found (< ${MIN_TEXTS}): the checks are vacuous`);
+    if (gs.length < MIN_GS) bad(`only ${gs.length} top-level .g found (< ${MIN_GS}): the checks are vacuous`);
 
     const scale = fig.getBoundingClientRect().width / VB.w;                                                      // 7
     let minPx = Infinity;
@@ -99,8 +111,7 @@
       if (px < minPx) minPx = px;
       if (!(px >= MIN_TEXT_PX)) bad(`${name(el, box(el))} renders at ${r1(px)} px (< ${MIN_TEXT_PX})`);
     }
-    out.minPx = minPx;
-    return out;
+    return { violations: out, minPx, nTexts: texts.length + tins.length, nG: gs.length };
   }
 
   // ---- driving the real UI ---------------------------------------------------------------
@@ -131,30 +142,34 @@
   function sweep() {
     need();
     const violations = [];
-    let combos = 0, minTextPx = Infinity;
+    let combos = 0, minTextPx = Infinity, minTexts = Infinity, minGs = Infinity;
     const pairs = [];
     for (const r of GRID) for (const t of GRID) pairs.push([r, t]);
     for (const p of NEAR_CANCEL) pairs.push(p);
-    for (const peak of ['A', 'B']) for (const [r, t] of pairs) {
-      const tag = tagOf(r, t, peak);
-      const probs = drive(r, t, peak, tag);
-      for (const p of probs) violations.push(p);
-      const found = checkFigure(tag);
-      for (const v of found) violations.push(v);
-      if (found.minPx < minTextPx) minTextPx = found.minPx;
-      combos++;
+    try {
+      for (const peak of ['A', 'B']) for (const [r, t] of pairs) {
+        const tag = tagOf(r, t, peak);
+        for (const p of drive(r, t, peak, tag)) violations.push(p);
+        const c = checkFigure(tag);
+        for (const v of c.violations) violations.push(v);
+        minTextPx = Math.min(minTextPx, c.minPx);
+        minTexts = Math.min(minTexts, c.nTexts);
+        minGs = Math.min(minGs, c.nG);
+        combos++;
+      }
+      if (combos !== EXPECTED_COMBOS) violations.push(`sweep ran ${combos} combos, expected ${EXPECTED_COMBOS}`);
+    } finally {
+      for (const p of restore()) violations.push(p);
     }
-    if (combos !== EXPECTED_COMBOS) violations.push(`sweep ran ${combos} combos, expected ${EXPECTED_COMBOS}`);
-    for (const p of restore()) violations.push(p);
-    return { combos, violations, minTextPx: r1(minTextPx) };
+    return { combos, violations, minTextPx: r1(minTextPx), minTexts, minGs };
   }
 
-  function plant(x, y, str) {
+  function plant(x, y, str, size) {
     const n = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     n.setAttribute('class', 't');
     n.setAttribute('x', x);
     n.setAttribute('y', y);
-    n.setAttribute('font-size', 16);
+    n.setAttribute('font-size', size);
     n.textContent = str;
     fig.appendChild(n);
     return n;
@@ -164,31 +179,58 @@
     need();
     restore();
     const first = fig.querySelector('text.t');
-    const onBeam = plant(300, 102, 'PROBE1');                                   // the beam's top face is y = 90, bottom 114
-    const onText = plant(first.getAttribute('x'), first.getAttribute('y'), 'PROBE2');   // exactly on an existing label
-    let named;
+    const planted = [];
+    const put = (x, y, str, size) => { const n = plant(x, y, str, size); planted.push(n); return n; };
+    let r;
     try {
-      named = checkFigure('probe').filter(v => v.includes('PROBE'));
+      // 1: inside the beam where nothing else is (past B, before C): exactly one graphic may be named, and it is the beam
+      const onBeam = put(500, 108, 'PROBE1', 16);
+      const pb = box(onBeam);
+      const beams = topLevelG().filter(e => e.tagName === 'rect' && e.getAttribute('class') === 'g')
+        .filter(e => { const b = box(e); return b.x0 <= pb.x0 && b.y0 <= pb.y0 && b.x1 >= pb.x1 && b.y1 >= pb.y1; });
+      put(first.getAttribute('x'), first.getAttribute('y'), 'PROBE2', 16);   // 2: exactly on an existing label
+      put(950, 300, 'PROBE3', 16);                                             // 3: runs past x = 960
+      put(500, 520, 'PROBE4', 10);                                             // 4: renders below 12 px
+      const named = checkFigure('probe').violations.filter(v => v.includes('PROBE'));
+      const of = (p) => named.filter(v => v.includes(p));
+      const beamCaught = beams.length === 1 && of('PROBE1').length === 1 &&
+        of('PROBE1')[0].endsWith(`overlaps ${name(beams[0], box(beams[0]))}`);
+      const textCaught = of('PROBE2').some(v => v.includes(`"${first.textContent}"`));
+      const clipCaught = of('PROBE3').some(v => v.includes('outside the viewBox'));
+      const smallCaught = of('PROBE4').some(v => v.includes('renders at'));
+      r = { beamCaught, textCaught, clipCaught, smallCaught, named: named.length };
     } finally {
-      onBeam.remove();
-      onText.remove();
+      for (const n of planted) n.remove();
+      restore();
     }
-    const beamCaught = named.some(v => v.includes('PROBE1') && /<rect/.test(v));
-    const textCaught = named.some(v => v.includes('PROBE2') && v.includes(`"${first.textContent}"`));
-    const cleanAfter = checkFigure('after').length === 0;
-    return { flagged: beamCaught && textCaught && cleanAfter, beamCaught, textCaught, cleanAfter, named: named.length };
+    r.cleanAfter = checkFigure('after').violations.length === 0;
+    r.flagged = r.beamCaught && r.textCaught && r.clipCaught && r.smallCaught && r.cleanAfter;
+    return r;
   }
 
   function budget() {
     need();
     const bottom = (el) => Math.round(el.getBoundingClientRect().bottom);
+    const inter = (a, b) => Math.round(Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+      Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)));
+    const innerH = window.innerHeight, doc = document.documentElement;
+    const figRect = fig.getBoundingClientRect();
     const figBottom = bottom(fig), controlsBottom = bottom(ui.controls), calcBottom = bottom(ui.calc);
-    const hscroll = document.documentElement.scrollWidth > window.innerWidth;
-    const controlsVisible = controlsBottom <= window.innerHeight;
-    const ok = figBottom <= window.innerHeight && controlsVisible && calcBottom <= window.innerHeight && !hscroll;
+    const pageHeight = doc.scrollHeight;
+    const sideOverlap = inter(ui.controls.parentElement.getBoundingClientRect(), figRect);   // the sticky .side row vs the figure, px^2
+    const controlsOverlap = inter(ui.controls.getBoundingClientRect(), figRect);
+    const calcOverlap = inter(ui.calc.getBoundingClientRect(), figRect);
+    const controlsClipped = ui.controls.scrollHeight > ui.controls.clientHeight + 1;
+    const calcClipped = ui.calc.scrollHeight > ui.calc.clientHeight + 1;
+    const hscroll = doc.scrollWidth > doc.clientWidth;
+    const controlsVisible = controlsBottom <= innerH;
+    const fits = pageHeight <= innerH;
+    const ok = figBottom <= innerH && controlsVisible && calcBottom <= innerH && !hscroll && fits &&
+      sideOverlap === 0 && controlsOverlap === 0 && calcOverlap === 0 && !controlsClipped && !calcClipped;
     return {
-      viewport: [window.innerWidth, window.innerHeight], figBottom, controlsBottom, calcBottom, hscroll, controlsVisible, ok,
-      scrollY: Math.round(window.scrollY), pageHeight: document.documentElement.scrollHeight   // informational
+      viewport: [window.innerWidth, innerH], figBottom, controlsBottom, calcBottom, hscroll, controlsVisible, ok,
+      pageHeight, fits, scrollY: Math.round(window.scrollY), sideOverlap, controlsOverlap, calcOverlap,
+      controlsClipped, calcClipped, docClientWidth: doc.clientWidth
     };
   }
 
@@ -197,7 +239,7 @@
     const s = sweep();
     return {
       install: inst,
-      sweep: { combos: s.combos, violationCount: s.violations.length, sample: s.violations.slice(0, 10), minTextPx: s.minTextPx },
+      sweep: { combos: s.combos, violationCount: s.violations.length, sample: s.violations.slice(0, 10), minTextPx: s.minTextPx, minTexts: s.minTexts, minGs: s.minGs },
       sensitivity: sensitivity(),
       budget: budget()
     };
