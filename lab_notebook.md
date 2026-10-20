@@ -1,5 +1,24 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 4: URL presets
+
+### Summary
+Added `src/presets.js` (pure, no DOM, no dependency on state.js) and `test/presets.test.js` (15 tests), and put `'presets.js'` after `'state.js'` in `MODULES` in `build.js`. `parsePresets(search)` reads `?r=`, `?t=` and `?peak=` and returns `{ r, t, peak, adjusted, ignored }` (r/t/peak are `undefined` when absent or ignored); `describePresets(p)` words it: `From the link: r = 100 N/m, t = −190 N/m, peak at B. Adjusted: r 7 → 0. Ignored: peak=c (use A or B).` (a part that is empty is left out; empty string when nothing was given). Behaviour is ported from `../torque_i_beam/src/presets.js` including its review fixes: unambiguous number regex, leading U+2212 turned into `-`, first duplicate wins, unknown params silently ignored, `adjusted` note only when the PRINTED before/after (`fmt`) differ, ignored raw value cut to 40 code points (`Array.from`) plus an ellipsis, `-0` becomes `0`. Tests first (RED: module not found), then GREEN; full suite 59/59.
+
+### Decisions made
+- Values are snapped with `snapW`, the same snapping as the sliders, so a link can never set a state a slider could not.
+- Note texts: ignored r/t `r=abc (use a number of N/m)`, ignored peak `peak=c (use A or B)`, adjusted `r 7 → 0`. In the description a value that was ignored is not listed among the set values. When only ignored/adjusted notes exist, the "From the link:" sentence is simply omitted (the brief says to omit an empty part), so e.g. `?peak=c` reads `Ignored: peak=c (use A or B).`.
+- `peak` is case-insensitive and trimmed (`b` gives `B`); case folding is not noted as an adjustment. Param names are case-sensitive (`R=50` is unknown and ignored).
+- The brief's 20,000-digit timing test is kept verbatim, but the ambiguous pattern `(\d+\.?\d*|\.\d+)` takes only ~180 ms at 20,000 digits here (under the 250 ms limit), so that test alone would not catch a regression. Added a second test at 60,000 digits (~1.6 s for the ambiguous pattern; verified by mutation that it fails with 'r took 1599 ms').
+- All top-level names in presets.js are `PRESET_*` / `preset*` so the build's duplicate-name check cannot collide with other modules.
+
+### Problems encountered
+- None beyond the timing-threshold finding above.
+
+### Open questions / next steps
+- Task 7 (app.js) should call `parsePresets(location.search)`, apply `{r, t, peak}` through `state.set`, and show `describePresets` as the link note.
+- Sources: design `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; plan `docs/superpowers/plans/2026-10-20-distributed-load-beam.md`; reference `../torque_i_beam/src/presets.js` and `../torque_i_beam/test/presets.test.js`.
+
 ## 2026-10-20 - Task 3: number formatting and state
 
 ### Summary
