@@ -293,3 +293,12 @@ test('a combined force that acts at the wall gets no arrow, and its text says so
     assert.equal(third[0].textContent, 'at x = 0.00 m from A (at the wall)');
   }
 });
+
+test('a combined force just off the wall (x = 0.10 m) gets no arrow and its text says "near the wall"', () => {
+  const svg = draw({ r: -130, t: 190, peak: 'B' });
+  const arrows = arrowGroups(svg).map(arrowOf).filter(a => a.width === 3.4);
+  assert.equal(arrows.length, 2);
+  assert.ok(arrows.every(a => a.color !== COLORS.comb));
+  const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2]);
+  assert.equal(third[0].textContent, 'at x = 0.10 m from A (near the wall)');
+});

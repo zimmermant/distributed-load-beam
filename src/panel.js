@@ -1,5 +1,5 @@
 import { LOADED_L, BEAM_L } from './physics.js';
-import { MINUS, fmt, fmtFixed } from './format.js';
+import { MINUS, fmt, fmtFixed, wallWord } from './format.js';
 import { derive } from './state.js';
 
 // The calculation, written out with the numbers substituted. Every number comes from
@@ -28,12 +28,14 @@ function panelTri(d, s) {
     `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)} m`;
 }
 
-// A word when the combined force acts off the beam (judged on the printed value).
+// A word when the combined force acts off the beam, or so close to the wall that no arrow is
+// drawn (both judged on the printed value, and worded like the figure's text).
 function panelWhere(x) {
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
   if (shown < 0) return ' (off the beam, left of the wall)';
   if (shown > BEAM_L) return ' (off the beam, beyond C)';
-  return '';
+  const wall = wallWord(x);
+  return wall ? ` (${wall}: no arrow is drawn)` : '';
 }
 
 // True when working the sum from the PRINTED (rounded) locations would not print the printed answer.

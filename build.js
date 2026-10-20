@@ -57,11 +57,10 @@ function hasTopLevelComma(line) {
 }
 
 export function strip(code) {
-  // Drop relative imports as whole statements rather than line-by-line: fbd.js's
-  // import of physics.js wraps its named list onto a second line, and a
-  // per-line filter never sees "from" on the opening line, so the statement
-  // (and the syntax error it leaves behind) survives. [^;]* cannot cross the
-  // statement's own semicolon, so this still can't run away into later code.
+  // Drop relative imports as whole statements rather than line-by-line: an import whose
+  // named list wraps onto a second line has no "from" on its opening line, so a per-line
+  // filter never sees it and the statement (and the syntax error it leaves behind) survives.
+  // [^;]* cannot cross the statement's own semicolon, so this still can't run away into later code.
   code = code.replace(/^\s*import\s[^;]*from\s+['"]\.\/[^'"]+['"]\s*;?[ \t]*$/gm, '');
   return code.split('\n')
     .filter(l => !/^\s*export\s*\{[^}]*\}\s*;?\s*$/.test(l))

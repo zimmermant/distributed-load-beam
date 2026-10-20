@@ -31,7 +31,7 @@ export function clear(node) {
 export function text(parent, x, y, str, opts = {}) {
   const node = el('text', {
     x, y,
-    'font-size': opts.size || 14,
+    'font-size': opts.size || 16,
     'font-family': 'system-ui, -apple-system, sans-serif',
     'font-style': opts.italic ? 'italic' : null,
     fill: opts.fill || COLORS.ink,

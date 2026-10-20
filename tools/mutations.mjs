@@ -22,7 +22,7 @@
 // (the SVG: classes, text size, arrow heads), panel (the worked calculation), controls (slider
 // and peak-button wiring), app (page wiring) and build (the single-scope bundler).
 //
-// The run works on a TEMPORARY COPY (src/, test/, build.js and package.json copied into the
+// The run works on a TEMPORARY COPY (src/, test/, tools/, build.js and package.json copied into the
 // system temp directory). The real repository is never written, so an interrupted run
 // (Ctrl-C) cannot leave a mutated source behind. The copy is removed at the end and on
 // SIGINT / SIGTERM. The whole suite runs once per row (a few seconds each).
@@ -35,7 +35,7 @@ import { tmpdir } from 'node:os';
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(join(tmpdir(), 'dlb-mut-'));
 const root = work;                       // every path below reads, writes and runs inside the copy
-for (const f of ['src', 'test', 'build.js', 'package.json']) cpSync(join(repo, f), join(work, f), { recursive: true });
+for (const f of ['src', 'test', 'build.js', 'package.json', 'tools']) cpSync(join(repo, f), join(work, f), { recursive: true });
 const cleanup = () => rmSync(work, { recursive: true, force: true });
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanup(); process.exit(130); });
 const MAX_FAILING = 12;
@@ -146,25 +146,29 @@ const MUTATIONS = [
   ['format.js', 'forceWords prints the signed value',
     'const mag = Math.abs(F);', 'const mag = F;'],
   ['format.js', 'locWords: the off-the-beam note is removed',
-    "(shown < 0 || shown > BEAM_L ? ' (off the beam)' : '')", "''"],
+    "shown < 0 || shown > BEAM_L ? 'off the beam' : wallWord(x)", 'wallWord(x)'],
   ['format.js', 'locWords: only a point beyond C is flagged',
-    "(shown < 0 || shown > BEAM_L ? ' (off", "(shown > BEAM_L ? ' (off"],
+    "shown < 0 || shown > BEAM_L ? 'off the beam'", "shown > BEAM_L ? 'off the beam'"],
   ['format.js', 'locWords: only a point left of the wall is flagged',
-    "(shown < 0 || shown > BEAM_L ? ' (off", "(shown < 0 ? ' (off"],
-  ['format.js', 'locWords never says "at the wall"',
-    "x >= 0 && x < WALL_CLEAR_M ? ' (at the wall)'", "false ? ' (at the wall)'"],
-  ['format.js', 'locWords says "at the wall" up to and including WALL_CLEAR_M',
-    'x >= 0 && x < WALL_CLEAR_M ?', 'x >= 0 && x <= WALL_CLEAR_M ?'],
-  ['format.js', 'locWords says "at the wall" for a point left of the wall too',
-    'x >= 0 && x < WALL_CLEAR_M ?', 'x < WALL_CLEAR_M ?'],
-  ['format.js', 'locWords says "at the wall" only at exactly 0',
-    'x >= 0 && x < WALL_CLEAR_M ?', 'x === 0 ?'],
+    "shown < 0 || shown > BEAM_L ? 'off the beam'", "shown < 0 ? 'off the beam'"],
+  ['format.js', 'wallWord never says "at the wall"',
+    "return shown === 0 ? 'at the wall' : 'near the wall';", "return 'near the wall';"],
+  ['format.js', 'wallWord never says "near the wall"',
+    "return shown === 0 ? 'at the wall' : 'near the wall';", "return 'at the wall';"],
+  ['format.js', 'wallWord says "at the wall" up to and including WALL_CLEAR_M',
+    '!(x < WALL_CLEAR_M)', '!(x <= WALL_CLEAR_M)'],
+  ['format.js', 'wallWord names a point left of the wall too',
+    "if (shown < 0) return '';", ''],
+  ['format.js', 'wallWord judges at/near on the unrounded value',
+    "return shown === 0 ? 'at the wall'", "return x === 0 ? 'at the wall'"],
+  ['format.js', 'locWords drops the wall note',
+    ': wallWord(x);', ": '';"],
   ['format.js', 'locWords judges off the beam on the unrounded value',
     "const shown = Number(fmtFixed(x).replace(MINUS, '-'));", 'const shown = x;'],
   ['format.js', 'locWords prints a location for a missing x',
     "if (x === null || x === undefined) return '';", "if (x === undefined) return '';"],
   ['format.js', 'locWords prints the location without fixed decimals',
-    'return `at x = ${fmtFixed(x)} m from A${note}`;', 'return `at x = ${fmt(x)} m from A${note}`;'],
+    'return `at x = ${fmtFixed(x)} m from A${word', 'return `at x = ${fmt(x)} m from A${word'],
   // MINUS is used by every printed negative number, so this row legitimately fails many tests
   // (15 at the time of writing): it carries its own, larger, limit.
   ['format.js', 'the minus sign is a hyphen-minus',
@@ -466,7 +470,7 @@ const MUTATIONS = [
   ['svg.js', 'text ignores the colour',
     'fill: opts.fill || COLORS.ink,', 'fill: COLORS.ink,'],
   ['svg.js', 'text ignores the size',
-    "'font-size': opts.size || 14,", "'font-size': 14,"],
+    "'font-size': opts.size || 16,", "'font-size': 20,"],
   ['svg.js', 'clear removes only the first child',
     'while (node.firstChild) node.removeChild(node.firstChild);', 'if (node.firstChild) node.removeChild(node.firstChild);'],
 
@@ -495,6 +499,10 @@ const MUTATIONS = [
     "const only = d.rect.F === 0 ? 'triangle' : 'rectangle';", "const only = d.rect.F === 0 ? 'rectangle' : 'triangle';"],
   ['panel.js', 'a point left of the wall is not flagged',
     "if (shown < 0) return ' (off the beam, left of the wall)';", ''],
+  ['panel.js', 'a point at or near the wall gets no note in the calculation',
+    "return wall ? ` (${wall}: no arrow is drawn)` : '';", "return '';"],
+  ['panel.js', 'the wall note is shown for every location',
+    "return wall ? ` (${wall}: no arrow is drawn)` : '';", "return ` (${wall || 'at the wall'}: no arrow is drawn)`;"],
   ['panel.js', 'a point beyond C is not flagged',
     "if (shown > BEAM_L) return ' (off the beam, beyond C)';", ''],
   ['panel.js', 'off the beam is judged on the unrounded value',

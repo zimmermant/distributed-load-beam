@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calcLines, createPanel } from '../src/panel.js';
+import { locWords } from '../src/format.js';
+import { equivalents } from '../src/physics.js';
 
 const XBAR = 'x̄';
 const plain = (html) => html.replace(/<[^>]*>/g, '');
@@ -158,4 +160,16 @@ test('off the beam is judged on the printed location: -0.001 and 4.003 print 0.0
   assert.ok(nearA.includes('= 0.00 m') && !/off the beam/.test(nearA), nearA);
   const nearC = text({ r: -44.45, t: 100, peak: 'B' }, 'comb');
   assert.ok(nearC.includes('= 4.00 m') && !/off the beam/.test(nearC), nearC);
+});
+
+test('no arrow near the wall: the calculation says why, in the figure\'s words (r=-130, t=190, peak B gives x = 0.10 m)', () => {
+  const near = text({ r: -130, t: 190, peak: 'B' }, 'comb');
+  assert.ok(near.includes('= 0.10 m (near the wall: no arrow is drawn)'), near);
+  assert.ok(!/off the beam/.test(near), near);
+  const at = text({ r: 100, t: -150, peak: 'B' }, 'comb');
+  assert.ok(at.includes('= 0.00 m (at the wall: no arrow is drawn)'), at);
+  const away = text({ r: 100, t: 100, peak: 'B' }, 'comb');
+  assert.ok(!/the wall/.test(away), away);
+  // the figure's text for the same state agrees
+  assert.equal(locWords(equivalents({ r: -130, t: 190, peak: 'B' }).comb.x), 'at x = 0.10 m from A (near the wall)');
 });

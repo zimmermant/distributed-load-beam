@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { W_MAX, W_STEP } from '../src/physics.js';
+import { VB } from '../src/layout.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const template = readFileSync(join(here, '..', 'src', 'index.template.html'), 'utf8');
@@ -18,8 +19,16 @@ test('the page declares both inline markers and loads nothing external', () => {
   assert.ok(!/<link[^>]+href=/.test(template), 'the template loads an external stylesheet');
 });
 
-test('the figure viewBox is 0 0 960 560', () => {
+test('the figure viewBox is 0 0 960 560, and it is the same one layout.js and the browser harness use', () => {
   assert.match(template, /<svg id="fig" viewBox="0 0 960 560"/);
+  const want = `0 0 ${VB.w} ${VB.h}`;
+  assert.equal(want, '0 0 960 560');
+  assert.ok(template.includes(`<svg id="fig" viewBox="${want}"`), 'the template viewBox differs from layout.js VB');
+  // the harness is read as text, not run: its constant must say the same numbers
+  const harness = readFileSync(join(here, '..', 'tools', 'browser-harness.js'), 'utf8');
+  const m = harness.match(/const VB = \{ w: (\d+), h: (\d+) \};/);
+  assert.ok(m, 'tools/browser-harness.js has no `const VB = { w: ..., h: ... };`');
+  assert.equal(`0 0 ${m[1]} ${m[2]}`, want, 'the harness viewBox differs from layout.js VB');
 });
 
 test('every id app.js looks up exists in the template', () => {
