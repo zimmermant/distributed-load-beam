@@ -1,5 +1,24 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 5: figure geometry (pure)
+
+### Summary
+Added `src/layout.js` (pure, no DOM; imports `BEAM_L`, `LOADED_L`, `loadAt` from physics.js) and `test/layout.test.js` (11 tests), and put `'layout.js'` after `'presets.js'` in `MODULES` in `build.js`. Exports `VB`, `BEAM_H`, `TOP`, `COLS`, `topX`, `colX`, `loadShapes(s)` -> `{rect, tri, arrows}` and `forceArrow(k, F, x)`. Tests first (RED: module not found), then GREEN; one mutation (apex end swapped) fails tests 8 and 9. Full suite and `dist/` rebuilt.
+
+### Decisions made
+- y grows downward; w > 0 (down) shapes and arrows sit ABOVE the beam with the arrow head on the beam top (`beamY`); w < 0 sit BELOW with the head on the beam bottom (`beamY + BEAM_H`).
+- Rectangle: `{x: topX(0), y, w: topX(2) - topX(0), h: |r|*unit}`, null when r = 0. Triangle: 3 points, base along the full width of AB, apex at the end where w is largest (peak A at topX(0), peak B at topX(2)), height `|t|*unit`. Base is the rectangle's outer edge when r and t point the same way, otherwise the beam face on the triangle's own side (also when r = 0). Null when t = 0.
+- Net arrows: 8 at x = (i + 0.5)*L/8 using `loadAt`, omitted when `|w|*unit < 8`; length exactly `|w|*unit`.
+- `forceArrow` returns null for F = 0, x null, x < 0, x > BEAM_L; x = 0 and x = 4 are drawn. Length is exactly `COLS.fs*|F|`. Worst case 600 N gives 108 = COLS.band; stacked r = t = 200 gives 80 = TOP.band, both exactly on the band edge (tests use <=).
+- Helper names are prefixed `layout`/`LAYOUT_` to stay unique in the shared scope.
+
+### Problems encountered
+- None.
+
+### Open questions / next steps
+- Task 6 (scene.js) draws from these shapes; the arrow `x` values are already viewBox units. Each triangle/rect/arrow needs class `g` there.
+- Sources: design `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; plan `docs/superpowers/plans/2026-10-20-distributed-load-beam.md` (Task 5).
+
 ## 2026-10-20 - Task 4: URL presets
 
 ### Summary
