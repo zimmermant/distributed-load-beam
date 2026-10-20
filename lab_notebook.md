@@ -1,5 +1,22 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 8 step 1: browser harness
+
+### Summary
+Added `tools/browser-harness.js` (207 lines, plain IIFE exposing `H`, not in the build, no src change). `H.install()` refuses a figure under 600 px wide; `H.sweep()` drives the real sliders (`input` events, no keydown) and peak buttons over the 9x9 grid x both peaks plus the six near-cancel pairs x both peaks (174 combos), asserting the sliders, readouts and pressed peak button match what was requested, and runs one shared `checkFigure(tag)` per state: texts and circle letters inside 0 0 960 560; text/text, text/top-level `.g`, text/`text.tin` disjoint (0.5-unit tolerance in both axes); top-level arrow groups vs `.pc` circles (tangent allowed); every top-level `.g` inside the viewBox; every text >= 12 rendered px (`minTextPx`). `H.sensitivity()` plants PROBE1 on the beam and PROBE2 on an existing label and requires both to be named, then that the figure is clean again. `H.budget()` reports bottoms of `#fig`, `#controls`, `#calc`, horizontal scroll and `ok`; `H.all()` runs everything. Step 2 (running it at 1280x720, 800x750, 1000x700) is the controller's.
+
+### Decisions made
+- Only TOP-LEVEL `.g` are measured (arrow and dimension groups' children carry no class). The dimension-line group also has a line first child, so it is treated as an arrow group for the circle check; it sits far from every circle, so this is harmless.
+- Violation strings start with the tag (`r=100 t=-190 peak=B`) and name elements by text content or `<tag.class> @bbox`.
+- `sensitivity()` also returns `beamCaught`, `textCaught`, `cleanAfter`; `budget()` adds informational `scrollY` and `pageHeight` because `#controls`/`#calc` sit in a sticky bottom row, whose rect bottom is clamped to the viewport and could hide a tall page; compare `pageHeight` with `innerHeight` when reading a 1000x700 result.
+
+### Problems encountered
+- No browser available to the implementer: validated with `node --check` and a throwaway stub DOM (scratchpad, not committed): H has the five functions plus `checkFigure`, install throws at 300 px, sensitivity returns flagged true against the stub, sweep runs 174 combos and reports drive mismatches against a stub that does not wire state. Real getBBox metrics, event wiring and layout are NOT validated.
+
+### Open questions / next steps
+- Controller runs the three viewports, fixes findings in src (not the harness), rebuilds, reruns.
+- Sources: brief `.superpowers/sdd/2026-10-20-distributed-load-beam/task-8-brief.md`; model `../torque_i_beam/tools/browser-harness.js`.
+
 ## 2026-10-20 - Task 7 fix round 1: fit the 800x750 viewport budget
 
 ### Summary
