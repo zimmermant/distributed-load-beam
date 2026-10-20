@@ -1,0 +1,145 @@
+# Distributed load on a beam
+
+A teaching simulation. A 4 m beam is fixed to a wall at **A**. Only the half **AB** (2 m) carries a load: a rectangular part and a triangular part, each set with a slider. The page draws the actual load, then replaces it with equivalent forces (one for the rectangle, one for the triangle, and one for the two combined), each with its size, direction and location, and writes out the calculation with the current numbers.
+
+Open `dist/distributed_load_beam.html` in any browser. It is one self-contained file (about 37 KB): no server, no network, no external URL.
+
+There is **no published URL yet.** Publishing (a separate public repo and GitHub Pages, the way `../torque_i_beam` was done) is a later step that waits for the author's go-ahead. Wherever this README shows `https://…/`, that is a placeholder for the address the page will have once it is published.
+
+## The beam and the sign convention
+
+A is at x = 0 (the wall), B at x = 2 m, C at x = 4 m, with x measured from A. Only AB is ever loaded; BC is drawn dimmer as "no load".
+
+**+ means pushing down, − means pushing up**, for loads and forces alike. The page states this on the figure ("+ down, − up"), writes a real minus sign (U+2212), and never prints `−0`, `NaN` or `Infinity`.
+
+## The controls
+
+| Control | What it does |
+|---|---|
+| **Rectangular load** slider | w, constant along AB, from −200 to +200 N/m in steps of 5. |
+| **Triangular load** slider | The triangle's peak value, same range and step. The triangle is that value at one end of AB and 0 at the other. |
+| **zero at A, peak at B** / **zero at B, peak at A** | Which end the triangle comes to a point (w = 0). A is the wall. Exactly one button is pressed. |
+
+Details that are easy to miss:
+
+- **Snap to zero.** A slider value within ±10 N/m of zero becomes exactly 0, so the first non-zero values are ±15. A green tick marks the centre of each scale and its "0" label lights up while the value is 0.
+- **Keyboard nudge.** One arrow-key step (5) is smaller than the snap zone, so a slider sitting at 0 could never leave it. A key press that would land back in the zone jumps straight to +15 or −15, in the direction of the key. A pointer drag just snaps.
+- Every control visibly responds to hover, press, keyboard focus and selection.
+
+The defaults are r = 100 N/m, t = 100 N/m, peak at B.
+
+## The equivalent forces
+
+L = 2 m throughout.
+
+| Force | Size | Where it acts |
+|---|---|---|
+| Rectangle | F = r × L | the middle of AB, x = 1.00 m |
+| Triangle | F = ½ × t × L | one third of the way in from the larger end: x = 0.67 m (peak at A) or x = 1.33 m (peak at B) |
+| Combined | F = F_rect + F_tri | x̄ = (F_rect × x_rect + F_tri × x_tri) / F, the point where the sum of moments about A is reproduced |
+
+Positive F points down. The three arrows share **one fixed scale** (the same length per newton for every force and every slider setting), so a bigger force is always a visibly longer arrow; nothing auto-rescales.
+
+When there is no arrow, the text under the figure says why:
+
+- **A part that is zero** has no force and no location ("no load of this kind").
+- **The combined force has no location only when F is exactly 0.** If both parts are non-zero that is a **couple**: equal and opposite forces at different places, which no single force can replace. The page says so ("the parts cancel: no single force") and adds a short note in the calculation. If both parts are zero it simply says "no load".
+- **The combined force can land off the beam** when opposite loads nearly cancel (for example r = 100, t = −190, peak B puts x̄ at −5.33 m, left of the wall; r = 100, t = −195, peak A puts it at 14.00 m, beyond C). No arrow is drawn, and the text says "(off the beam)". The calculation says whether that is left of the wall or beyond C.
+- **A force within 0.12 m of the wall** (0 ≤ x̄ < 0.12 m, `WALL_CLEAR_M` in `src/physics.js`) is not drawn either, because the arrow head would overlap the wall. The text reads "at x = 0.00 m from A (at the wall)". Example: r = 100, t = −150, peak B gives 50 N down at x̄ = 0.
+
+Nothing here is stored: the state is only `r`, `t` and `peak`, and everything else is computed from them.
+
+## Presetting a problem from the link
+
+Add optional query parameters to the page's address to start from a chosen setup. Any combination works; anything left out keeps its default.
+
+| Parameter | Meaning | Accepted text |
+|---|---|---|
+| `r` | rectangular load, N/m | a number |
+| `t` | triangular peak load, N/m | a number |
+| `peak` | which end the triangle peaks at | `A` or `B` (either case) |
+
+Numbers are plain decimals (`-150`, `+5`, `.5`, `1.`; no exponent, no hex, not empty). The page prints negative numbers with a real minus sign (−), and a number copied from the screen with that sign (a leading U+2212) is accepted too. A value that does not parse is ignored, as if absent. If a parameter is repeated, the **first one wins**. **Unknown parameters are ignored.**
+
+Values are **snapped exactly as the sliders would snap them**: clamped to ±200, rounded to a multiple of 5, and anything within ±10 of zero becomes 0. A "From the link" line under the title says what was set, what snapping changed (for example `r 500 → 200`) and what was ignored (a rejected value is echoed back, cut at 40 characters). For example `?r=500&t=3&peak=Q` shows: `From the link: r = 200 N/m, t = 0 N/m. Adjusted: r 500 → 200; t 3 → 0. Ignored: peak=Q (use A or B).` The line is written as text only, so nothing in the link can become markup.
+
+Presets apply **once, at load**. **Nothing is locked**: students can still move every control, and reloading the link restores the setup.
+
+Worked example links (shown relative to the page; put the `?...` part after `distributed_load_beam.html`, or after the placeholder address once published):
+
+```
+distributed_load_beam.html?r=100&t=100&peak=B      # the defaults, written out
+distributed_load_beam.html?r=100&t=-200&peak=B     # the parts cancel: F = 0, a couple, no single force
+distributed_load_beam.html?r=100&t=-150&peak=B     # combined 50 N down at the wall: no arrow, text says "at the wall"
+distributed_load_beam.html?r=-75&t=150&peak=A      # upward rectangle under a downward triangle peaking at the wall
+```
+
+## Embedding in another page
+
+The page sends no `X-Frame-Options` or CSP header and has no frame-busting code, so it can sit in an iframe (for example in a Canvas page):
+
+```html
+<iframe src="https://…/distributed_load_beam.html?r=100&t=-100&peak=B" width="100%" height="750" style="border:0; max-width:800px" title="Distributed load on a beam" loading="lazy"></iframe>
+```
+
+- **The address is a placeholder.** There is no published URL yet (see the top of this file).
+- **Size.** The page is built to fit, with the whole figure and every control visible and no scrolling, in two budgets: **800 × 750** (an 800 px-wide Canvas iframe) and **1280 × 720** (a laptop browser). The snippet's `height="750"` and `max-width:800px` are those numbers.
+- **Phones are out of scope.** Nothing is promised or tested below 700 px wide; the page stacks, shrinks and scrolls there.
+- Presets work inside the frame (put the `?...` part on the `src`), and one page can hold several frames with different presets.
+- Some hosts (an LMS, for instance) restrict which sites an iframe may load; that is a setting on their side. It has not been tried in any particular host.
+
+## Layout in the window
+
+The budgets drove the layout, and the numbers matter if you change the CSS (`src/styles.css`):
+
+- The **figure is capped at 740 px wide** (a 960 × 560 viewBox, so SVG text of 16 units renders at about 12.3 px, just over the 12 px floor).
+- From 700 px up, the **controls and the calculation sit in one row under the figure, and that row sticks to the bottom of the window**, so the controls stay in view while the figure is watched.
+- From **1150 px** up, the figure is on the left and the controls over the calculation are in a 340 px right column. The breakpoint is computed: 740 + 20 gap + 340 + 32 body padding = 1132, plus up to 15 px for a scrollbar = 1147, rounded up to 1150. Below it the figure would shrink under 740 px and its text under 12 px.
+
+## Develop
+
+```bash
+export NODE=/opt/homebrew/Cellar/node@22/22.23.2_1/bin/node   # Homebrew's `node` is broken on this machine
+$NODE --test test/*.test.js        # always a glob: `node --test test/` misreports here
+$NODE build.js                     # writes dist/distributed_load_beam.html
+$NODE tools/mutations.mjs --coverage --strict
+                                   # breaks one thing at a time; the suite must fail each time, and
+                                   # every test must fail under at least one break (a test with no
+                                   # demonstrated teeth exits 1). Runs on a temporary copy, never
+                                   # your files; takes about 13 minutes.
+```
+
+**Checking the real page in a browser.** Unit tests cannot see overlap, clipping or whether the page fits the window, so there is a browser harness (`tools/browser-harness.js`; its header explains every phase).
+
+1. From the repo root: `python3 -m http.server 8742 --bind 127.0.0.1`
+2. Open `http://127.0.0.1:8742/dist/distributed_load_beam.html` in a browser sized **800 × 750** (then reload so the layout settles).
+3. In the browser's JavaScript console: `eval(await (await fetch('/tools/browser-harness.js')).text()); H.all()`
+
+A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 174 combinations and reports `violations: []` (no text touching text, a graphic, the viewBox edge or an arrow over the wall; every text at least 12 px); `sensitivity` reports `flagged: true` (it plants an overlap, a clipped text and a tiny text and requires each to be named, then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky row does not cover the figure). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
+
+## Layout of the code
+
+| Module | Job |
+|---|---|
+| `physics.js` | Constants (beam, range, step, snap zone, `WALL_CLEAR_M`), `snapW`, `nextW` (the keyboard jump), `loadAt`, `equivalents`. |
+| `format.js` | The only place a number is rounded for display: `fmt`, `fmtFixed` (locations, always two decimals), `forceWords`, `locWords`. |
+| `svg.js` | `el` / `clear` / `text` helpers and the colour palette. |
+| `state.js` | The store: three stored values (`r`, `t`, `peak`); everything else is `derive()`d. |
+| `presets.js` | URL presets: `parsePresets` and `describePresets`. Held outside the state. |
+| `layout.js` | Figure geometry as pure functions (the viewBox, the fixed force scale `COLS.fs`, `loadShapes`, `forceArrow`). |
+| `scene.js` | Draws the SVG from the state alone. |
+| `panel.js` | The worked calculation, as a pure string (`calcLines`). |
+| `controls.js` | Binds the sliders and peak buttons to the state; `controlsView` is pure. |
+| `app.js` | Wiring, the presets and the "From the link" line. |
+| `index.template.html`, `styles.css` | The page and its styles, inlined by `build.js`. |
+
+## Rules this codebase keeps
+
+- **Derive, never store.** The stored state is only `r`, `t` and `peak`.
+- **One rounding point.** Numbers reach the screen only through `fmt` / `fmtFixed` (forces whole, locations two decimals). `-0` is impossible by construction.
+- **One shared scope after inlining**, so every top-level name must be unique across modules. The build fails on a duplicate, and also on a column-0 statement that declares more than one name or destructures.
+- **Fixed force scale.** Arrow length is `fs × |F|`, with no per-state rescaling.
+- **Class contracts the browser harness relies on.** Every graphic drawn by `scene.js` carries class `g` (the wall and its hatching also `wall`; the A, B, C circles also `pc`); every text carries class `t` (letters inside the circles: `tin`); every SVG text is at least 16 units. Remove a class and the harness stops seeing that element.
+- **Tests that scan HTML strip the tags first** (the markup carries `style` attributes with hyphens before digits), then look for `-0`, `NaN`, `Infinity` and a hyphen-minus before a digit.
+- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (309 rows; every row caught; all 153 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
+- **Link text never becomes markup.** The calculation is built only from numbers formatted by `fmt` / `fmtFixed` and fixed strings; the "From the link" line is set with `textContent`.
