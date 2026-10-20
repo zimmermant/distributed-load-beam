@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VB, BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow } from '../src/layout.js';
-import { BEAM_L, LOADED_L, loadAt } from '../src/physics.js';
+import { BEAM_L, LOADED_L, WALL_CLEAR_M, loadAt, equivalents } from '../src/physics.js';
 
 const EPS = 1e-9;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < EPS, `${msg || ''} ${a} vs ${b}`);
@@ -30,18 +30,34 @@ test('forceArrow length is fs·|F| for every F in -600..600 step 10', () => {
   assert.equal(n, 3 * 120);
 });
 
-test('forceArrow is null for F 0, x null, x below 0 and x above BEAM_L, and drawn at x exactly 0 and 4', () => {
+test('forceArrow is null for F 0, x null, x below WALL_CLEAR_M and x above BEAM_L; drawn at WALL_CLEAR_M and at 4', () => {
   assert.equal(BEAM_L, 4);
+  assert.equal(WALL_CLEAR_M, 0.12);
   assert.equal(forceArrow(0, 0, 1), null);
   assert.equal(forceArrow(1, 100, null), null);
   assert.equal(forceArrow(2, 100, -0.001), null);
+  assert.equal(forceArrow(2, 100, 0), null);
+  assert.equal(forceArrow(2, 100, 0.1199), null);
   assert.equal(forceArrow(2, 100, BEAM_L + 0.001), null);
-  const a0 = forceArrow(0, 100, 0);
+  const a0 = forceArrow(0, 100, WALL_CLEAR_M);
   const a4 = forceArrow(0, 100, 4);
   assert.notEqual(a0, null);
   assert.notEqual(a4, null);
-  assert.equal(a0.x, colX(0, 0));
+  assert.equal(a0.x, colX(0, WALL_CLEAR_M));
   assert.equal(a4.x, colX(0, 4));
+});
+
+test('the wall clearance is wider than the arrow head half-width (stroke 3.4 * 1.6 + 1) in units', () => {
+  assert.ok(WALL_CLEAR_M * COLS.px > 3.4 * 1.6 + 1);
+});
+
+test('r=100, t=-150, peak B: the combined force acts at x = 0 and gets no arrow (it would sit on the wall)', () => {
+  for (const s of [{ r: 100, t: -150, peak: 'B' }, { r: -100, t: 150, peak: 'B' }]) {
+    const e = equivalents(s);
+    assert.equal(e.comb.x + 0, 0);                  // + 0: the second state's x is -0, which is still the wall
+    assert.notEqual(e.comb.F, 0);
+    assert.equal(forceArrow(2, e.comb.F, e.comb.x), null);
+  }
 });
 
 test('a down force ends on the beam top and an up force on the beam bottom', () => {

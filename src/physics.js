@@ -3,6 +3,7 @@ export const LOADED_L = 2;          // m, the loaded half AB
 export const W_MAX = 200;           // N/m, slider range is -W_MAX..+W_MAX
 export const W_STEP = 5;            // N/m
 export const W_SNAP = 10;           // N/m, |w| <= W_SNAP snaps to 0
+export const WALL_CLEAR_M = 0.12;   // m, a force arrow closer to the wall than this is not drawn (its head would overlap the wall)
 
 // Slider value -> allowed value: clamp, round to W_STEP, snap the zero zone to 0.
 // Non-finite input becomes 0, and the result is never -0.

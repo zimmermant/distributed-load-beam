@@ -161,6 +161,7 @@ const LOADED_L = 2;          // m, the loaded half AB
 const W_MAX = 200;           // N/m, slider range is -W_MAX..+W_MAX
 const W_STEP = 5;            // N/m
 const W_SNAP = 10;           // N/m, |w| <= W_SNAP snaps to 0
+const WALL_CLEAR_M = 0.12;   // m, a force arrow closer to the wall than this is not drawn (its head would overlap the wall)
 
 // Slider value -> allowed value: clamp, round to W_STEP, snap the zero zone to 0.
 // Non-finite input becomes 0, and the result is never -0.
@@ -248,8 +249,9 @@ function locWords(x) {
   if (x === null || x === undefined) return '';
   // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  const off = shown < 0 || shown > BEAM_L ? ' (off the beam)' : '';
-  return `at x = ${fmtFixed(x)} m from A${off}`;
+  // A location this close to the wall has no arrow (layout.js forceArrow, same raw-x rule): say so in words.
+  const note = x >= 0 && x < WALL_CLEAR_M ? ' (at the wall)' : (shown < 0 || shown > BEAM_L ? ' (off the beam)' : '');
+  return `at x = ${fmtFixed(x)} m from A${note}`;
 }
 
 // ===== svg.js =====
@@ -489,9 +491,10 @@ function loadShapes(s) {
 }
 
 // Equivalent force F (signed, + down) at x metres from A in column k, or null
-// when there is nothing to draw (no force, no location, or off the beam).
+// when there is nothing to draw (no force, no location, off the beam, or closer to the wall than
+// WALL_CLEAR_M: the head would overlap the wall, so the text carries that location instead).
 function forceArrow(k, F, x) {
-  if (F === 0 || x === null || x === undefined || x < 0 || x > BEAM_L) return null;
+  if (F === 0 || x === null || x === undefined || x < WALL_CLEAR_M || x > BEAM_L) return null;
   return layoutArrow(colX(k, x), F, COLS.fs * Math.abs(F), COLS.beamY);
 }
 

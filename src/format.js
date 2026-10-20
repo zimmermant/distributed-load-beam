@@ -1,4 +1,4 @@
-import { BEAM_L } from './physics.js';
+import { BEAM_L, WALL_CLEAR_M } from './physics.js';
 
 export const MINUS = '−';
 
@@ -36,6 +36,7 @@ export function locWords(x) {
   if (x === null || x === undefined) return '';
   // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  const off = shown < 0 || shown > BEAM_L ? ' (off the beam)' : '';
-  return `at x = ${fmtFixed(x)} m from A${off}`;
+  // A location this close to the wall has no arrow (layout.js forceArrow, same raw-x rule): say so in words.
+  const note = x >= 0 && x < WALL_CLEAR_M ? ' (at the wall)' : (shown < 0 || shown > BEAM_L ? ' (off the beam)' : '');
+  return `at x = ${fmtFixed(x)} m from A${note}`;
 }

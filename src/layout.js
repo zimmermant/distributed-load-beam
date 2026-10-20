@@ -1,4 +1,4 @@
-import { BEAM_L, LOADED_L, loadAt } from './physics.js';
+import { BEAM_L, LOADED_L, WALL_CLEAR_M, loadAt } from './physics.js';
 
 // Figure geometry, all in viewBox units with y growing downward. Pure: no DOM.
 // Sign convention: a positive (down) load or force sits ABOVE the beam and its
@@ -68,8 +68,9 @@ export function loadShapes(s) {
 }
 
 // Equivalent force F (signed, + down) at x metres from A in column k, or null
-// when there is nothing to draw (no force, no location, or off the beam).
+// when there is nothing to draw (no force, no location, off the beam, or closer to the wall than
+// WALL_CLEAR_M: the head would overlap the wall, so the text carries that location instead).
 export function forceArrow(k, F, x) {
-  if (F === 0 || x === null || x === undefined || x < 0 || x > BEAM_L) return null;
+  if (F === 0 || x === null || x === undefined || x < WALL_CLEAR_M || x > BEAM_L) return null;
   return layoutArrow(colX(k, x), F, COLS.fs * Math.abs(F), COLS.beamY);
 }

@@ -52,7 +52,10 @@ test('locWords: null, on the beam, off the beam', () => {
   assert.equal(locWords(null), '');
   assert.equal(locWords(1), 'at x = 1.00 m from A');
   assert.equal(locWords(1.1111), 'at x = 1.11 m from A');
-  assert.equal(locWords(0), 'at x = 0.00 m from A');
+  assert.equal(locWords(0), 'at x = 0.00 m from A (at the wall)');
+  assert.equal(locWords(-0), 'at x = 0.00 m from A (at the wall)');
+  assert.equal(locWords(0.05), 'at x = 0.05 m from A (at the wall)');
+  assert.equal(locWords(0.12), 'at x = 0.12 m from A');
   assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
   assert.equal(locWords(4), 'at x = 4.00 m from A');
   assert.ok(locWords(-16 / 3).endsWith('(off the beam)'));

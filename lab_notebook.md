@@ -1,5 +1,22 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 8 fix round 1 (a): no force arrow over the wall
+
+### Summary
+The harness review found that at r=100, t=-150, peak B (and r=-100, t=150) the combined force is at x = 0 exactly, so its arrow head (half-width 3.4*1.6+1 = 6.44 units) overlapped the wall rectangle. Controller ruling: an arrow closer to the wall than `WALL_CLEAR_M = 0.12` m is not drawn and the text says so. `physics.js` exports `WALL_CLEAR_M`; `layout.js forceArrow` returns null for x < WALL_CLEAR_M (x = 0.12 and x = 4 are drawn); `format.js locWords` returns `at x = 0.00 m from A (at the wall)` for 0 <= x < WALL_CLEAR_M (never together with `(off the beam)`). scene.js unchanged. dist rebuilt.
+
+### Decisions made
+- 0.12 m x COLS.px 60 = 7.2 units > 6.44, pinned by a test. The only place 0.12 appears in src is the constant.
+- The text rule uses the same raw x as the arrow rule; `-0` (the second state's x) counts as the wall; a tiny negative like -0.001 stays `at x = 0.00 m from A` (no arrow, not on the beam by the printed value).
+- New tests: forceArrow null at 0, 0.1199, -0.001, 4.001, drawn at 0.12 and 4; both Review states have comb.x == 0 (+0 for -0) and a null arrow; locWords at 0, -0, 0.05, 0.12.
+
+### Problems encountered
+- The second state's x is `-0`, not 0: strict equality in the test needed `+ 0`.
+- Another implementer (Task 9) has uncommitted files in the same checkout (test edits, tools/mutations.mjs); this commit staged only its own paths, and test/layout.test.js was staged from HEAD plus my hunks only.
+
+### Open questions / next steps
+- Controller re-checks the column text at r=100,t=-150,peak B in the browser (34 characters, shorter than the 37-character off-beam text).
+
 ## 2026-10-20 - Task 8 step 1: browser harness
 
 ### Summary
