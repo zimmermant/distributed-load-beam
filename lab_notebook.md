@@ -1,5 +1,23 @@
 # Lab Notebook
 
+## 2026-10-20 - Merged to main
+
+### Summary
+`feat/initial-build` (the whole distributed-load beam simulation, including URL presets and the dotted load outlines) was merged into `main` with `--no-ff` (merge commit e778fa6) at Todd's request ("merge to main"). `main` had not moved since the fork (bb352a1), so the merge was clean. There is no remote: nothing was pushed or published, and there is no live URL.
+
+### Decisions made
+- Local merge (option 1 of the finishing menu); `--no-ff` keeps the build's history visible as one unit.
+- Re-verified on the merged tree: 168 of 168 tests pass; `node build.js` reproduces the committed `dist/distributed_load_beam.html` byte-for-byte (40,306 bytes); working tree clean. The browser harness and the full mutation audit were run on the same code before the merge (final: 335 rows all caught, 168 of 168 tests covered; harness clean at 800x750, 1280x720 and 1000x700).
+- Deleted the merged branch. The git-ignored SDD workspace was left in place; the durable record of every ruling and fix round is `docs/superpowers/sdd-ledger-distributed-load-beam.md`.
+
+### Problems encountered
+None during the merge.
+
+### Open questions / next steps
+- Publishing (a separate public repo with `docs/` stripped from the history, MIT licence, root redirect page and GitHub Pages, as for `torque_i_beam`) only when Todd gives the go-ahead. A preset link must point at the `dist/...` address because the root redirect drops query strings.
+- Items awaiting Todd's confirmation: three columns instead of the mockup's rows; a force within 0.12 m of the wall draws no arrow (text says "at the wall" / "near the wall"); the peak buttons no longer say "(wall)"; very small forces (about 5 N) draw as a speck on the fixed force scale.
+- Sources: `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`, `docs/superpowers/plans/2026-10-20-distributed-load-beam.md`, `docs/superpowers/mutation-audit-report.md`, `../torque_i_beam` (the pattern followed; live at https://zimmermant.github.io/torque-i-beam/).
+
 ## 2026-10-20 - Dotted outline of the load in each equivalent-force column (Todd's request)
 
 ### Summary
