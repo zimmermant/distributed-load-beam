@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distributed load on a beam</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 6px 16px 6px;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #111827;
+  background: #ffffff;
+}
+h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 600; }
+h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
+
+/* ---- page layout -------------------------------------------------------
+   below 700 px: everything stacked
+   700 px and up: the figure, then controls and calculation side by side (that row sticks to
+     the bottom of the window, so the controls stay in view while the figure scrolls)
+   1150 px and up: figure on the left, controls over calculation in a 340 px right column.
+     The figure must stay >= 740 px wide there (text >= 12 px): 740 + 20 gap + 340 column
+     + 32 body padding = 1132, plus up to 15 for a scrollbar = 1147, so the breakpoint is 1150. */
+.page { max-width: 1100px; margin: 0 auto; }
+.fig-col { max-width: 740px; margin: 0 auto; }
+#fig { display: block; width: 100%; height: auto; }
+.side { max-width: 740px; margin: 6px auto 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
+.panel { border: 1px solid #d5dbe3; border-radius: 8px; padding: 6px 12px; background: #f9fafb; }
+@media (min-width: 700px) {
+  .side {
+    grid-template-columns: 1.25fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
+    position: sticky; bottom: 0; z-index: 2; background: #ffffff; border-top: 1px solid #d5dbe3; box-shadow: 0 -4px 6px -4px #0003;
+  }
+}
+@media (min-width: 1150px) {
+  .page { display: grid; grid-template-columns: minmax(0, 740px) 340px; column-gap: 20px; align-items: start; justify-content: center; }
+  .page > h1, .page > #from-link { grid-column: 1 / -1; }
+  .fig-col { grid-column: 1; margin: 0; }
+  .side { grid-column: 2; grid-template-columns: 1fr; max-width: none; padding: 0; position: static; border-top: 0; box-shadow: none; }
+}
+
+/* ---- the "From the link" note: one small unboxed line under the title ---- */
+#from-link { margin: 0 0 2px; font-size: 13px; line-height: 1.3; color: #744210; }
+#from-link[hidden] { display: none; }
+
+/* ---- colours shared by labels and the calculation ------------------- */
+.c-rect { color: #2b6cb0; }
+.c-tri { color: #c05621; }
+.c-comb { color: #2f855a; }
+
+/* ---- sliders ----------------------------------------------------------- */
+.ctl { margin-bottom: 4px; }
+.ctl-head { font-size: 15px; line-height: 1.3; }
+.ctl-head label { cursor: pointer; }
+.readout { font-variant-numeric: tabular-nums; display: inline-block; min-width: 2.6em; text-align: right; }
+.zs { position: relative; padding-top: 2px; }
+.zt { position: absolute; left: 50%; top: 2px; width: 2px; height: 26px; margin-left: -1px; background: #2f855a; border-radius: 1px; pointer-events: none; }
+.zs input[type=range] {
+  position: relative; z-index: 1; display: block; width: 100%; height: 26px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+.zs input[type=range]:focus { outline: none; }
+.zs input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #a0aec0; }
+.zs input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: #a0aec0; }
+.zs input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; box-sizing: border-box; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: #ffffff; border: 3px solid #2d3748; box-shadow: 0 1px 3px #0004; transition: transform .08s, background .08s, border-color .08s;
+}
+.zs input[type=range]::-moz-range-thumb {
+  box-sizing: border-box; width: 22px; height: 22px; border-radius: 50%; background: #ffffff; border: 3px solid #2d3748; box-shadow: 0 1px 3px #0004;
+  transition: transform .08s, background .08s, border-color .08s;
+}
+.zs input[type=range]:hover::-webkit-slider-runnable-track { background: #718096; }
+.zs input[type=range]:hover::-moz-range-track { background: #718096; }
+.zs input[type=range]:hover::-webkit-slider-thumb { background: #ebf8ff; border-color: #2b6cb0; transform: scale(1.12); }
+.zs input[type=range]:hover::-moz-range-thumb { background: #ebf8ff; border-color: #2b6cb0; transform: scale(1.12); }
+.zs input[type=range]:active::-webkit-slider-thumb { background: #2b6cb0; border-color: #2c5282; transform: scale(1.2); }
+.zs input[type=range]:active::-moz-range-thumb { background: #2b6cb0; border-color: #2c5282; transform: scale(1.2); }
+.zs input[type=range]:focus-visible::-webkit-slider-thumb { border-color: #2b6cb0; box-shadow: 0 0 0 4px #2b6cb066; }
+.zs input[type=range]:focus-visible::-moz-range-thumb { border-color: #2b6cb0; box-shadow: 0 0 0 4px #2b6cb066; }
+.zl { position: relative; display: flex; justify-content: space-between; margin-top: 1px; font-size: 13px; line-height: 1.3; opacity: .9; }
+.zl .zero-label {
+  position: absolute; left: 50%; transform: translateX(-50%); padding: 0 8px; font-weight: 700; color: #2f855a;
+  border-radius: 10px; transition: background .1s, color .1s;
+}
+.zl .zero-label.on { background: #2f855a; color: #ffffff; }
+
+/* ---- the peak buttons ----------------------------------------------- */
+.peak-q { margin-top: 2px; font-size: 14px; line-height: 1.3; }
+.peak-row { display: flex; gap: 6px; margin-top: 3px; }
+.peak-btn {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; padding: 4px 6px; font: inherit; font-size: 13px; line-height: 1.3; color: #111827; text-align: left;
+  background: #edf2f7; border: 2px solid #a0aec0; border-radius: 6px; cursor: pointer;
+}
+.peak-btn svg { flex: none; }
+.peak-btn:hover { background: #e2e8f0; border-color: #4a5568; }
+.peak-btn:active { background: #cbd5e0; transform: translateY(1px); }
+.peak-btn:focus-visible { outline: 3px solid #2b6cb0; outline-offset: 2px; }
+.peak-btn.sel { background: #f0fff4; border-color: #2f855a; box-shadow: 0 0 0 2px #2f855a33; font-weight: 600; }
+.peak-btn.sel:hover { background: #e6fffa; }
+.peak-btn.sel:active { background: #c6f6d5; }
+
+/* ---- the calculation ------------------------------------------------ */
+#calc { font-size: 13px; line-height: 1.4; }
+#calc .cl { margin-bottom: 5px; }
+#calc .cl:last-child { margin-bottom: 0; }
+#calc .note { font-style: italic; color: #4a5568; }
+#calc .rnd { color: #4a5568; }
+
+</style>
+</head>
+<body>
+<main class="page">
+<h1>Distributed load on a beam</h1>
+<p id="from-link" hidden></p>
+<div class="fig-col">
+<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4 metre beam fixed to a wall at A, with a distributed load on the half AB, and below it the equivalent force of each part and of the two combined"></svg>
+</div>
+<div class="side">
+<section id="controls" class="panel" aria-label="Load controls">
+  <div class="ctl">
+    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b> N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200 (up)</span><span id="r-zero" class="zero-label">0</span><span>+200 (down)</span></div>
+    </div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b> N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200 (up)</span><span id="t-zero" class="zero-label">0</span><span>+200 (down)</span></div>
+    </div>
+  </div>
+  <div class="peak">
+    <div id="peak-label" class="peak-q">Which end comes to a point (w = 0)?</div>
+    <div class="peak-row" role="group" aria-labelledby="peak-label">
+      <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A, peak at B</span></button>
+      <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A</span></button>
+    </div>
+  </div>
+</section>
+<section class="panel calc-panel">
+  <h2>How each force is calculated (L = 2 m)</h2>
+  <div id="calc" aria-live="polite"></div>
+</section>
+</div>
+</main>
+<script>
+(function () {
+"use strict";
+// ===== physics.js =====
+const BEAM_L = 4;            // m, the whole beam (A at the wall, B at the middle, C at the tip)
+const LOADED_L = 2;          // m, the loaded half AB
+const W_MAX = 200;           // N/m, slider range is -W_MAX..+W_MAX
+const W_STEP = 5;            // N/m
+const W_SNAP = 10;           // N/m, |w| <= W_SNAP snaps to 0
+const WALL_CLEAR_M = 0.12;   // m, a force arrow closer to the wall than this is not drawn (its head would overlap the wall)
+
+// Slider value -> allowed value: clamp, round to W_STEP, snap the zero zone to 0.
+// Non-finite input becomes 0, and the result is never -0.
+function snapW(v) {
+  if (!Number.isFinite(v)) return 0;
+  const clamped = Math.max(-W_MAX, Math.min(W_MAX, v));
+  const stepped = Math.round(clamped / W_STEP) * W_STEP;
+  return Math.abs(stepped) <= W_SNAP ? 0 : stepped + 0;
+}
+
+// Slider input handler. A pointer drag just snaps. A keyboard nudge that would
+// land back in the zero zone while the slider already sits at 0 would never be
+// able to leave 0 (one step is smaller than the zone), so it jumps straight
+// past the zone to +-(W_SNAP + W_STEP) in the direction of the nudge.
+function nextW(prev, raw, viaKeyboard) {
+  const snapped = snapW(raw);
+  if (viaKeyboard && prev === 0 && snapped === 0 && raw !== 0 && Number.isFinite(raw)) {
+    return raw > 0 ? W_SNAP + W_STEP : -(W_SNAP + W_STEP);
+  }
+  return snapped;
+}
+
+// Load intensity w(x) in N/m at x metres from A, 0 <= x <= LOADED_L.
+// s = { r, t, peak }; the triangle is t at its peak end and 0 at the other.
+function loadAt(s, x) {
+  const frac = s.peak === 'B' ? x / LOADED_L : 1 - x / LOADED_L;
+  return s.r + s.t * frac;
+}
+
+// Equivalent forces: signed F (+ down) and x in m from A (null when F is 0).
+// The combined location comes from summing moments about A. The triangle's
+// moment is written as t*L*L/3 (peak B) or t*L*L/6 (peak A), which equals
+// F_tri * x_tri but keeps round numbers exact (e.g. -12 rather than -11.999...).
+function equivalents(s) {
+  const L = LOADED_L;
+  const rectF = s.r * L + 0;
+  const triF = 0.5 * s.t * L + 0;
+  const triX = s.peak === 'B' ? 2 * L / 3 : L / 3;
+  const rectM = rectF * (L / 2);
+  const triM = s.peak === 'B' ? s.t * L * L / 3 : s.t * L * L / 6;
+  const combF = rectF + triF + 0;
+  const rect = { F: rectF, x: rectF === 0 ? null : L / 2 };
+  const tri = { F: triF, x: triF === 0 ? null : triX };
+  const comb = { F: combF, x: combF === 0 ? null : (rectM + triM) / combF };
+  const couple = combF === 0 && (rectF !== 0 || triF !== 0);
+  return { rect, tri, comb, couple };
+}
+
+// ===== format.js =====
+
+
+const MINUS = '−';
+
+// The only way a number reaches the screen. Rounds here and nowhere else; a
+// null or non-finite value prints as a dash; and negative zero can never
+// appear, because String(-0) is "0" and Number("-0.00") is -0.
+function fmt(n, dp = 2) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const s = String(Number(n.toFixed(dp)));
+  return s.startsWith('-') ? MINUS + s.slice(1) : s;
+}
+
+// Always exactly dp decimals ("1.00", "4.00"): used for locations along the beam, where the
+// trailing zeros are part of the reading. A tiny negative that rounds to zero prints "0.00"
+// (toFixed keeps the sign: (-0.001).toFixed(2) is "-0.00"). Non-finite or missing prints a dash.
+function fmtFixed(n, dp = 2) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  let s = n.toFixed(dp);
+  if (/^-0(\.0*)?$/.test(s)) s = s.slice(1);
+  return s.startsWith('-') ? MINUS + s.slice(1) : s;
+}
+
+// Signed force (+ down) in words: "200 N down", "10 N up", "0 N".
+// Whole numbers print with no decimals, anything else with two.
+function forceWords(F) {
+  const mag = Math.abs(F);
+  const dp = Number.isInteger(mag) ? 0 : 2;
+  const text = fmt(mag, dp);
+  if (text === '0' || text === '—') return `${text} N`;
+  return `${text} N ${F > 0 ? 'down' : 'up'}`;
+}
+
+// '' away from the wall; 'at the wall' or 'near the wall' for a location that gets no arrow
+// (x < WALL_CLEAR_M, the rule of layout.js forceArrow). Judged on the PRINTED value: a location
+// that prints 0.00 is "at" the wall, one that prints 0.01..0.12 is "near" it, and one that prints
+// below 0 is off the beam instead (that note is locWords's and panelWhere's).
+function wallWord(x) {
+  if (x === null || x === undefined || !(x < WALL_CLEAR_M)) return '';
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  if (shown < 0) return '';
+  return shown === 0 ? 'at the wall' : 'near the wall';
+}
+
+// Location in words; '' when there is none (x null). Flags a point beyond the beam, or at or near the wall.
+function locWords(x) {
+  if (x === null || x === undefined) return '';
+  // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : wallWord(x);
+  return `at x = ${fmtFixed(x)} m from A${word ? ` (${word})` : ''}`;
+}
+
+// ===== svg.js =====
+const NS = 'http://www.w3.org/2000/svg';
+
+// One palette for the whole app. It lives here rather than in each renderer
+// because build.js concatenates every module into a single scope, so a
+// top-level `const C1` in three files would collide and fail the build.
+const COLORS = {
+  rect:    '#2b6cb0',   // the rectangular load and its equivalent force
+  tri:     '#c05621',   // the triangular load and its equivalent force
+  comb:    '#2f855a',   // the combined equivalent force
+  ink:     '#111827',   // text and outlines
+  beam:    '#8a94a6',   // the beam
+  wall:    '#cbd5e0',   // the wall and its hatching
+  outline: '#4a5568'    // beam outline
+};
+
+function el(name, attrs = {}, parent = null) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) {
+    const v = attrs[k];
+    if (v !== null && v !== undefined) node.setAttribute(k, String(v));
+  }
+  if (parent) parent.appendChild(node);
+  return node;
+}
+
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+// Text with a background-coloured halo so labels stay readable where they cross lines.
+function text(parent, x, y, str, opts = {}) {
+  const node = el('text', {
+    x, y,
+    'font-size': opts.size || 16,
+    'font-family': 'system-ui, -apple-system, sans-serif',
+    'font-style': opts.italic ? 'italic' : null,
+    fill: opts.fill || COLORS.ink,
+    'text-anchor': opts.anchor || 'start',
+    'font-weight': opts.weight || 400,
+    'paint-order': 'stroke',
+    stroke: '#ffffff',
+    'stroke-width': opts.halo === false ? 0 : 3.5,
+    'stroke-linejoin': 'round'
+  }, parent);
+  node.textContent = str;
+  return node;
+}
+
+// ===== state.js =====
+
+
+const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+
+// Everything is derived from {r, t, peak}; nothing else is stored.
+function derive(s) {
+  return equivalents(s);
+}
+
+// Pure store: no DOM. Subscribers are called with a copy of the new state, and
+// only when a stored value actually changed.
+function createState() {
+  let cur = { ...DEFAULTS };
+  const subs = new Set();
+
+  function commit(next) {
+    if (next.r === cur.r && next.t === cur.t && next.peak === cur.peak) return;
+    cur = next;
+    const snapshot = { ...cur };
+    for (const fn of [...subs]) fn(snapshot);
+  }
+
+  const isPeak = (p) => p === 'A' || p === 'B';
+
+  return {
+    getState: () => ({ ...cur }),
+    setR: (raw, viaKeyboard) => commit({ ...cur, r: nextW(cur.r, raw, viaKeyboard) }),
+    setT: (raw, viaKeyboard) => commit({ ...cur, t: nextW(cur.t, raw, viaKeyboard) }),
+    setPeak: (p) => { if (isPeak(p)) commit({ ...cur, peak: p }); },
+    // A batch (presets): each field is snapped, missing/invalid fields are kept, one notification.
+    set: (p = {}) => commit({
+      r: p.r === undefined ? cur.r : nextW(cur.r, p.r, false),
+      t: p.t === undefined ? cur.t : nextW(cur.t, p.t, false),
+      peak: isPeak(p.peak) ? p.peak : cur.peak
+    }),
+    subscribe: (fn) => { subs.add(fn); return () => { subs.delete(fn); }; },
+    reset: () => commit({ ...DEFAULTS })
+  };
+}
+
+// ===== presets.js =====
+
+
+
+// Optional URL parameters that preset a problem:
+//   r=N/m  rectangular load    t=N/m  triangular peak load    peak=A|B  where the triangle peaks
+// Presets are configuration read once at load, held OUTSIDE the state. Every number goes through
+// snapW (the same snapping as the sliders) and a change you could see is reported.
+
+// No exponent, no hex, no empty. Written unambiguously (\d+(\.\d*)?, not \d+\.?\d*): the looser
+// form backtracks quadratically on a long digit string with a bad last character.
+const PRESET_NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+const PRESET_SHOWN_MAX = 40;                      // characters of a rejected value echoed back
+const PRESET_NUMBER_HINT = 'use a number of N/m';
+const PRESET_PEAK_HINT = 'use A or B';
+
+function presetNumber(text) {
+  // The page prints a real minus sign (U+2212), so a number pasted from the screen starts with one.
+  const s = text.trim().replace(/^−/, '-');
+  if (!PRESET_NUMBER.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;           // 400 digits overflow to Infinity
+}
+
+// A rejected value is echoed back, but a 2,000-character one would overflow the page.
+function presetShown(raw) {
+  const chars = Array.from(raw);
+  return chars.length > PRESET_SHOWN_MAX ? chars.slice(0, PRESET_SHOWN_MAX).join('') + '…' : raw;
+}
+
+// Reads a load. Returns the snapped value, or undefined (and an ignored note) when it is not a number.
+function presetLoad(name, raw, out) {
+  const n = presetNumber(raw);
+  if (n === null) {
+    out.ignored.push(`${name}=${presetShown(raw)} (${PRESET_NUMBER_HINT})`);
+    return undefined;
+  }
+  const s = snapW(n);                              // never -0
+  // Compare what would be PRINTED: a snap too small to show (100.0001 to 100) is no news.
+  if (fmt(n) !== fmt(s)) out.adjusted.push(`${name} ${fmt(n)} → ${fmt(s)}`);
+  return s;
+}
+
+function presetPeak(raw, out) {
+  const v = raw.trim().toUpperCase();
+  if (v === 'A' || v === 'B') return v;
+  out.ignored.push(`peak=${presetShown(raw)} (${PRESET_PEAK_HINT})`);
+  return undefined;
+}
+
+function parsePresets(search) {
+  const q = new URLSearchParams(search || '');
+  const out = { r: undefined, t: undefined, peak: undefined, adjusted: [], ignored: [] };
+  // The first duplicate wins (get); a missing key is null. Notes follow the order r, t, peak.
+  const r = q.get('r');
+  if (r !== null) out.r = presetLoad('r', r, out);
+  const t = q.get('t');
+  if (t !== null) out.t = presetLoad('t', t, out);
+  const peak = q.get('peak');
+  if (peak !== null) out.peak = presetPeak(peak, out);
+  return out;
+}
+
+function describePresets(p) {
+  const set = [];
+  if (p.r !== undefined) set.push(`r = ${fmt(p.r)} N/m`);
+  if (p.t !== undefined) set.push(`t = ${fmt(p.t)} N/m`);
+  if (p.peak !== undefined) set.push(`peak at ${p.peak}`);
+  const parts = [];
+  if (set.length) parts.push(`From the link: ${set.join(', ')}.`);
+  else if (p.adjusted.length || p.ignored.length) parts.push('From the link: nothing set.');
+  if (p.adjusted.length) parts.push(`Adjusted: ${p.adjusted.join('; ')}.`);
+  if (p.ignored.length) parts.push(`Ignored: ${p.ignored.join('; ')}.`);
+  return parts.join(' ');
+}
+
+// ===== layout.js =====
+
+
+// Figure geometry, all in viewBox units with y growing downward. Pure: no DOM.
+// Sign convention: a positive (down) load or force sits ABOVE the beam and its
+// arrow head touches the beam's top face; a negative one sits BELOW and the head
+// touches the beam's bottom face.
+const VB = { w: 960, h: 560 };
+const BEAM_H = 24;
+// top figure (the actual load); `band` is the room above and below the beam
+const TOP = { x0: 90, px: 150, beamY: 90, unit: 0.2, band: 80, dimY: 206, dimTextY: 228, textX: 730 };
+// three columns (the equivalent forces); fs is the FIXED force scale, units per newton
+const COLS = { x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306] };
+
+const LAYOUT_MIN_ARROW = 8;   // net-load arrows shorter than this are not drawn
+const LAYOUT_ARROWS = 8;
+
+// metres from A -> viewBox x in the top figure
+function topX(x) {
+  return TOP.x0 + x * TOP.px;
+}
+
+// column k (0 rect, 1 tri, 2 comb), metres from A -> viewBox x
+function colX(k, x) {
+  return COLS.x[k] + COLS.offset + x * COLS.px;
+}
+
+// One arrow of length len pointing at the beam from the side the sign says.
+function layoutArrow(x, signed, len, beamY) {
+  const yHead = signed > 0 ? beamY : beamY + BEAM_H;
+  const yTail = signed > 0 ? yHead - len : yHead + len;
+  return { x, yTail, yHead };
+}
+
+// s = { r, t, peak } -> { rect, tri, arrows }
+function loadShapes(s) {
+  const x0 = topX(0);
+  const x2 = topX(LOADED_L);
+  const beamTop = TOP.beamY;
+  const beamBot = TOP.beamY + BEAM_H;
+  const rh = Math.abs(s.r) * TOP.unit;
+  const th = Math.abs(s.t) * TOP.unit;
+
+  let rect = null;
+  if (s.r !== 0) {
+    rect = { x: x0, y: s.r > 0 ? beamTop - rh : beamBot, w: x2 - x0, h: rh };
+  }
+
+  let tri = null;
+  if (s.t !== 0) {
+    const up = s.t > 0;                                  // triangle above the beam
+    const stacked = s.r !== 0 && (s.r > 0) === up;       // same side as the rectangle
+    const face = up ? beamTop : beamBot;
+    const base = stacked ? (up ? beamTop - rh : beamBot + rh) : face;
+    const apexY = up ? base - th : base + th;
+    const apexX = s.peak === 'A' ? x0 : x2;
+    tri = { pts: [[x0, base], [x2, base], [apexX, apexY]] };
+  }
+
+  const arrows = [];
+  for (let i = 0; i < LAYOUT_ARROWS; i++) {
+    const m = (i + 0.5) * LOADED_L / LAYOUT_ARROWS;
+    const w = loadAt(s, m);
+    const len = Math.abs(w) * TOP.unit;
+    if (len < LAYOUT_MIN_ARROW) continue;
+    arrows.push(layoutArrow(topX(m), w, len, beamTop));
+  }
+  return { rect, tri, arrows };
+}
+
+// Equivalent force F (signed, + down) at x metres from A in column k, or null
+// when there is nothing to draw (no force, no location, off the beam, or closer to the wall than
+// WALL_CLEAR_M: the head would overlap the wall, so the text carries that location instead).
+function forceArrow(k, F, x) {
+  if (F === 0 || x === null || x === undefined || x < WALL_CLEAR_M || x > BEAM_L) return null;
+  return layoutArrow(colX(k, x), F, COLS.fs * Math.abs(F), COLS.beamY);
+}
+
+// One piece of a load outline in column k: the load runs from xa to xb metres with signed
+// intensity wa at xa and wb at xb (same sign, either may be 0). The base lies on the beam face the
+// load pushes from (top for +, bottom for -); the height is the intensity at the top figure's scale.
+// A zero end contributes no point, so a piece with one zero end is a triangle, never a degenerate shape.
+function layoutPiece(k, xa, xb, wa, wb) {
+  const base = wa + wb > 0 ? COLS.beamY : COLS.beamY + BEAM_H;
+  const poly = [[colX(k, xa), base]];
+  if (wa !== 0) poly.push([colX(k, xa), base - wa * TOP.unit]);
+  if (wb !== 0) poly.push([colX(k, xb), base - wb * TOP.unit]);
+  poly.push([colX(k, xb), base]);
+  return poly;
+}
+
+// The net load w(x) = r + t f(x) on AB: its two end values, split at the zero crossing if the sign changes.
+function layoutNet(s) {
+  const w0 = loadAt(s, 0);
+  const wL = loadAt(s, LOADED_L);
+  if (w0 === 0 && wL === 0) return [];
+  if (w0 * wL < 0) {
+    const xc = LOADED_L * w0 / (w0 - wL);
+    return [layoutPiece(2, 0, xc, w0, 0), layoutPiece(2, xc, LOADED_L, 0, wL)];
+  }
+  return [layoutPiece(2, 0, LOADED_L, w0, wL)];
+}
+
+// Dotted outline of the load that column k's force replaces: 0 the rectangle, 1 the triangle,
+// 2 the net (combined) load. s = { r, t, peak } -> array of polygons (arrays of [x, y], closed
+// implicitly), empty when that load is zero.
+function columnOutline(k, s) {
+  if (k === 0) return s.r === 0 ? [] : [layoutPiece(0, 0, LOADED_L, s.r, s.r)];
+  if (k === 1) {
+    if (s.t === 0) return [];
+    return [s.peak === 'B' ? layoutPiece(1, 0, LOADED_L, 0, s.t) : layoutPiece(1, 0, LOADED_L, s.t, 0)];
+  }
+  return layoutNet(s);
+}
+
+// ===== scene.js =====
+
+
+
+
+
+
+// Drawing style only: every position and length comes from layout.js.
+const SCENE_TEXT = 16;            // every text is at least this many units (12 px at 800 px wide)
+const SCENE_LINE_MAX = 24;        // characters per line in the top-right text block
+const SCENE_FILL = 0.2;           // fill opacity of the load shapes
+const SCENE_DASH = '5 3';
+const SCENE_OUTLINE_DASH = '2 4';  // the dotted outline of the load in each column
+const SCENE_OUTLINE_W = 1.8;
+const SCENE_WALL_W = 14;
+const SCENE_WALL_OVER = 18;       // the wall rises this far above and below the beam
+const SCENE_HATCHES = 4;
+const SCENE_PIN_R = BEAM_H / 2;   // the A, B, C circles exactly fill the beam's height
+const SCENE_HEAD_MAX = 9;         // arrow head length cap
+
+// A text node with its class set (svg.js's text() takes no class option).
+function sceneText(parent, x, y, str, opts, cls = 't') {
+  const node = text(parent, x, y, str, { size: SCENE_TEXT, ...opts });
+  node.setAttribute('class', cls);
+  return node;
+}
+
+// One arrow group: shaft line plus head path, the head's tip at (a.x, a.yHead).
+function sceneArrow(parent, a, color, width) {
+  const dir = a.yHead > a.yTail ? 1 : -1;
+  const headLen = Math.min(SCENE_HEAD_MAX, Math.abs(a.yHead - a.yTail) * 0.6);
+  const half = width * 1.6 + 1;
+  const yBase = a.yHead - dir * headLen;
+  const g = el('g', { class: 'g' }, parent);
+  el('line', { x1: a.x, y1: a.yTail, x2: a.x, y2: yBase, stroke: color, 'stroke-width': width }, g);
+  el('path', { d: `M${a.x - half} ${yBase} L${a.x} ${a.yHead} L${a.x + half} ${yBase} Z`, fill: color }, g);
+  return g;
+}
+
+// A beam copy starting at x0 with its top face at y, `px` units per metre,
+// a hatched wall at A and A, B, C circles centred on the beam's mid-line.
+function sceneBeam(parent, x0, y, px) {
+  el('rect', { class: 'g', x: x0, y, width: BEAM_L * px, height: BEAM_H, fill: COLORS.beam, stroke: COLORS.outline }, parent);
+  const wallTop = y - SCENE_WALL_OVER;
+  const wallH = BEAM_H + 2 * SCENE_WALL_OVER;
+  const wallX = x0 - SCENE_WALL_W;
+  el('rect', { class: 'g wall', x: wallX, y: wallTop, width: SCENE_WALL_W, height: wallH, fill: COLORS.wall, stroke: COLORS.outline }, parent);
+  const step = wallH / SCENE_HATCHES;
+  for (let i = 0; i < SCENE_HATCHES; i++) {
+    el('line', {
+      class: 'g wall', x1: wallX, y1: wallTop + (i + 1) * step, x2: wallX - SCENE_WALL_W, y2: wallTop + i * step,
+      stroke: COLORS.outline
+    }, parent);
+  }
+  const cy = y + BEAM_H / 2;
+  const pins = [['A', 0], ['B', LOADED_L], ['C', BEAM_L]];
+  for (const [name, m] of pins) {
+    const cx = x0 + m * px;
+    el('circle', { class: 'g pc', cx, cy, r: SCENE_PIN_R, fill: '#ffffff', stroke: COLORS.ink, 'stroke-width': 1.6 }, parent);
+    sceneText(parent, cx, cy + 6, name, { anchor: 'middle', weight: 700, halo: false }, 'tin');
+  }
+}
+
+// The top-right text block as [string, colour, bold] lines. A line longer than
+// SCENE_LINE_MAX characters is split after its colon, so nothing runs off the page.
+function sceneTopLines(s) {
+  const lines = [['Actual load on AB', COLORS.ink, true]];
+  const entries = [
+    [`Rectangular: ${fmt(s.r, 0)} N/m`, COLORS.rect],
+    [`Triangular: peak ${fmt(s.t, 0)} N/m at ${s.peak}`, COLORS.tri]
+  ];
+  for (const [str, color] of entries) {
+    if (str.length <= SCENE_LINE_MAX) { lines.push([str, color, false]); continue; }
+    const cut = str.indexOf(': ') + 1;
+    lines.push([str.slice(0, cut), color, false], [str.slice(cut + 1), color, false]);
+  }
+  return lines;
+}
+
+// The three text lines of equivalent-force column k: name, force, location.
+function sceneColumnLines(name, part, d) {
+  const F = part.F;
+  let third;
+  if (F === 0) {
+    if (name !== 'Combined') third = 'no load of this kind';
+    else third = d.couple ? 'the parts cancel: no single force' : 'no load';
+  } else {
+    third = locWords(part.x);
+  }
+  return [name, F === 0 ? '0 N' : forceWords(F), third];
+}
+
+function sceneTop(svg, s) {
+  const shapes = loadShapes(s);
+  if (shapes.rect) {
+    const r = shapes.rect;
+    el('rect', {
+      class: 'g', x: r.x, y: r.y, width: r.w, height: r.h, fill: COLORS.rect, 'fill-opacity': SCENE_FILL,
+      stroke: COLORS.rect, 'stroke-dasharray': SCENE_DASH
+    }, svg);
+  }
+  if (shapes.tri) {
+    const pts = shapes.tri.pts.map(p => p.join(' ')).join(' L');
+    el('path', {
+      class: 'g', d: `M${pts} Z`, fill: COLORS.tri, 'fill-opacity': SCENE_FILL,
+      stroke: COLORS.tri, 'stroke-dasharray': SCENE_DASH
+    }, svg);
+  }
+  for (const a of shapes.arrows) sceneArrow(svg, a, COLORS.ink, 1.4);
+  sceneBeam(svg, topX(0), TOP.beamY, TOP.px);
+
+  const g = el('g', { class: 'g' }, svg);
+  const tick = 5;
+  const xA = topX(0), xB = topX(LOADED_L), xC = topX(BEAM_L);
+  const y = TOP.dimY;
+  el('line', { x1: xA, y1: y, x2: xB, y2: y, stroke: COLORS.outline }, g);
+  el('line', { x1: xA, y1: y - tick, x2: xA, y2: y + tick, stroke: COLORS.outline }, g);
+  el('line', { x1: xB, y1: y - tick, x2: xB, y2: y + tick, stroke: COLORS.outline }, g);
+  el('line', { x1: xB, y1: y, x2: xC, y2: y, stroke: COLORS.beam, 'stroke-dasharray': '4 3' }, g);
+  el('line', { x1: xC, y1: y - tick, x2: xC, y2: y + tick, stroke: COLORS.beam }, g);
+  sceneText(svg, (xA + xB) / 2, TOP.dimTextY, 'AB = 2 m (loaded)', { anchor: 'middle' });
+  sceneText(svg, (xB + xC) / 2, TOP.dimTextY, 'BC = 2 m (no load)', { anchor: 'middle' }).setAttribute('opacity', 0.6);
+
+  // heading, rectangular, triangular (one or two lines), then the sign note
+  const dy = [-28, -6, 16, 38, 60];
+  const lines = sceneTopLines(s);
+  lines.forEach(([str, color, bold], i) => {
+    sceneText(svg, TOP.textX, TOP.beamY + dy[i], str, { fill: color, weight: bold ? 700 : 400 });
+  });
+  sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ down, − up)', {}).setAttribute('opacity', 0.7);
+}
+
+// A dotted, unfilled outline of one layout polygon (its points as given, closed with Z).
+function sceneOutline(parent, poly, color) {
+  const d = `M${poly.map(p => p.join(' ')).join(' L')} Z`;
+  return el('path', {
+    class: 'g outline', d, fill: 'none', stroke: color, 'stroke-width': SCENE_OUTLINE_W,
+    'stroke-dasharray': SCENE_OUTLINE_DASH, 'stroke-linecap': 'round'
+  }, parent);
+}
+
+function sceneColumns(svg, d, s) {
+  const parts = [
+    ['Rectangular', d.rect, COLORS.rect],
+    ['Triangular', d.tri, COLORS.tri],
+    ['Combined', d.comb, COLORS.comb]
+  ];
+  parts.forEach(([name, part, color], k) => {
+    sceneBeam(svg, colX(k, 0), COLS.beamY, COLS.px);
+    for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
+    const a = forceArrow(k, part.F, part.x);
+    if (a) sceneArrow(svg, a, color, 3.4);
+    const lines = sceneColumnLines(name, part, d);
+    lines.forEach((str, i) => {
+      if (str === '') return;
+      sceneText(svg, COLS.x[k], COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
+    });
+  });
+}
+
+// render(s) clears the figure and redraws it from s = { r, t, peak } alone.
+function createScene(svg) {
+  return {
+    render(s) {
+      clear(svg);
+      sceneTop(svg, s);
+      sceneColumns(svg, derive(s), s);
+    }
+  };
+}
+
+// ===== panel.js =====
+
+
+
+
+// The calculation, written out with the numbers substituted. Every number comes from
+// fmt (forces, whole) or fmtFixed (locations, two decimals); everything else is a fixed
+// string, so no URL text can reach this HTML.
+const PANEL_XBAR = 'x̄';
+
+// A negative number inside a sum or product is written in parentheses.
+function panelPar(n) {
+  const text = fmt(n);
+  return text.startsWith(MINUS) ? `(${text})` : text;
+}
+
+function panelRect(d, s) {
+  const name = '<span class="c-rect"><b>Rectangle</b></span>';
+  if (d.rect.F === 0) return `${name}: w = 0, so there is no rectangular load and no force from it.`;
+  return `${name} (constant w): F = w × L = ${panelPar(s.r)} × ${fmt(LOADED_L)} = <b>${fmt(d.rect.F)} N</b>, ` +
+    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)} m`;
+}
+
+function panelTri(d, s) {
+  const peak = s.peak === 'A' ? 'A' : 'B';          // never raw text into innerHTML
+  const name = '<span class="c-tri"><b>Triangle</b></span>';
+  if (d.tri.F === 0) return `${name}: peak = 0, so there is no triangular load and no force from it.`;
+  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t)} × ${fmt(LOADED_L)} = <b>${fmt(d.tri.F)} N</b>, ` +
+    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)} m`;
+}
+
+// A word when the combined force acts off the beam, or so close to the wall that no arrow is
+// drawn (both judged on the printed value, and worded like the figure's text).
+function panelWhere(x) {
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  if (shown < 0) return ' (off the beam, left of the wall)';
+  if (shown > BEAM_L) return ' (off the beam, beyond C)';
+  const wall = wallWord(x);
+  return wall ? ` (${wall}: no arrow is drawn)` : '';
+}
+
+// True when working the sum from the PRINTED (rounded) locations would not print the printed answer.
+function panelNeedsExact(d) {
+  const shown = (v) => Number(fmtFixed(v));
+  const again = (d.rect.F * shown(d.rect.x) + d.tri.F * shown(d.tri.x)) / d.comb.F;
+  return fmtFixed(again) !== fmtFixed(d.comb.x);
+}
+
+function panelComb(d) {
+  const name = '<span class="c-comb"><b>Combined</b></span>';
+  const sum = `F = ${panelPar(d.rect.F)} + (${fmt(d.tri.F)}) = <b>${fmt(d.comb.F)} N</b>`;
+  if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so there is no combined force.`;
+  if (d.comb.F === 0) return `${name}: ${sum}: the two parts cancel, so no single force replaces them.`;
+  if (d.rect.F === 0 || d.tri.F === 0) {
+    const only = d.rect.F === 0 ? 'triangle' : 'rectangle';
+    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)} m</b> ` +
+      `(only the ${only} acts, so its location is the combined one)${panelWhere(d.comb.x)}`;
+  }
+  const num = `${panelPar(d.rect.F)} × ${fmtFixed(d.rect.x)} + ${panelPar(d.tri.F)} × ${fmtFixed(d.tri.x)}`;
+  const exact = panelNeedsExact(d) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F)} = <b>${fmtFixed(d.comb.x)} m</b>` +
+    `${panelWhere(d.comb.x)}${exact}`;
+}
+
+// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'note', html }]. Pure.
+function calcLines(s) {
+  const d = derive(s);
+  const lines = [
+    { key: 'rect', html: panelRect(d, s) },
+    { key: 'tri', html: panelTri(d, s) },
+    { key: 'comb', html: panelComb(d) }
+  ];
+  if (d.couple) {
+    lines.push({
+      key: 'note',
+      html: 'Equal and opposite forces that act at different places do not cancel their turning effect: ' +
+        'together they leave a couple, which no single force can replace.'
+    });
+  }
+  return lines;
+}
+
+// Writes the lines into el, and only when the text changed (a screen reader hears no repeat).
+function createPanel(el) {
+  let last = null;
+  return {
+    render(s) {
+      const html = calcLines(s).map(l => `<div class="cl ${l.key}">${l.html}</div>`).join('');
+      if (html === last) return;
+      last = html;
+      el.innerHTML = html;
+    }
+  };
+}
+
+// ===== controls.js =====
+
+
+// Pure: what the controls show for state s.
+function controlsView(s) {
+  return { rText: fmt(s.r), tText: fmt(s.t), rZero: s.r === 0, tZero: s.t === 0, peak: s.peak };
+}
+
+// Keys that move a range input; a pointer drag is everything else.
+const CONTROLS_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
+
+function controlsSetText(node, str) {
+  if (node.textContent !== str) node.textContent = str;
+}
+
+// root: the controls container (key and pointer events are heard here).
+// parts: { rSlider, tSlider, peakA, peakB, rReadout, tReadout, rZero, tZero } -- the page's elements.
+// Binds the sliders and the peak buttons to state; render(s) shows state s in them.
+function createControls(root, state, parts) {
+  const { rSlider, tSlider, peakA, peakB, rReadout, tReadout, rZero, tZero } = parts;
+  let viaKeyboard = false;
+
+  function showSlider(slider, readout, zeroLabel, text, value, zero) {
+    // Move the thumb when the state's value differs from it: a snap, or the keyboard's jump past the zero zone.
+    if (Number(slider.value) !== value) slider.value = String(value);
+    slider.setAttribute('aria-valuetext', `${text} N/m`);
+    controlsSetText(readout, text);
+    if (zeroLabel) zeroLabel.classList.toggle('on', zero);
+  }
+
+  function showPeak(button, on) {
+    button.classList.toggle('sel', on);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function render(s) {
+    const v = controlsView(s);
+    showSlider(rSlider, rReadout, rZero, v.rText, s.r, v.rZero);
+    showSlider(tSlider, tReadout, tZero, v.tText, s.t, v.tZero);
+    showPeak(peakA, v.peak === 'A');
+    showPeak(peakB, v.peak === 'B');
+  }
+
+  // A key marks the NEXT input event as a keyboard one; that event clears the mark. A key that
+  // changes nothing (a slider already at its end) fires no input, so a key release, a pointer
+  // press and losing focus clear it too, or the next drag would be taken for a key press.
+  const clearKey = () => { viaKeyboard = false; };
+  root.addEventListener('keydown', (e) => { if (CONTROLS_KEYS.includes(e.key)) viaKeyboard = true; });
+  root.addEventListener('keyup', clearKey);
+  root.addEventListener('pointerdown', clearKey);
+  root.addEventListener('focusout', clearKey);
+  if (typeof window !== 'undefined') window.addEventListener('blur', clearKey);
+
+  function onInput(set) {
+    const kb = viaKeyboard;
+    viaKeyboard = false;
+    set(kb);
+    render(state.getState());   // the state may not have changed (a snap back to 0): still put the thumb right
+  }
+  rSlider.addEventListener('input', () => onInput((kb) => state.setR(Number(rSlider.value), kb)));
+  tSlider.addEventListener('input', () => onInput((kb) => state.setT(Number(tSlider.value), kb)));
+  peakA.addEventListener('click', () => state.setPeak('A'));
+  peakB.addEventListener('click', () => state.setPeak('B'));
+
+  return { render };
+}
+
+// ===== app.js =====
+
+
+
+
+
+
+// Everything is looked up by id here, once; the modules get the elements, never the document.
+function appStart() {
+  document.title = 'Distributed load on a beam';
+  const state = createState();
+  const scene = createScene(document.getElementById('fig'));
+  const panel = createPanel(document.getElementById('calc'));
+  const controls = createControls(document.getElementById('controls'), state, {
+    rSlider: document.getElementById('r-slider'),
+    tSlider: document.getElementById('t-slider'),
+    peakA: document.getElementById('peak-a'),
+    peakB: document.getElementById('peak-b'),
+    rReadout: document.getElementById('r-readout'),
+    tReadout: document.getElementById('t-readout'),
+    rZero: document.getElementById('r-zero'),
+    tZero: document.getElementById('t-zero')
+  });
+
+  // Presets from the link apply once, before the first render. Only the fields the link set.
+  const presets = parsePresets(location.search);
+  const fields = {};
+  for (const k of ['r', 't', 'peak']) if (presets[k] !== undefined) fields[k] = presets[k];
+  state.set(fields);
+  const note = describePresets(presets);
+  const link = document.getElementById('from-link');
+  link.textContent = note;            // text only: the link's own text can never become markup
+  link.hidden = note === '';
+
+  function sync() {
+    const s = state.getState();
+    scene.render(s);
+    panel.render(s);
+    controls.render(s);
+  }
+  state.subscribe(sync);
+  sync();
+}
+
+appStart();
+
+})();
+</script>
+</body>
+</html>
