@@ -1,5 +1,22 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 2: physics module
+
+### Summary
+Added `src/physics.js` (pure, no DOM) and `test/physics.test.js`, and put `'physics.js'` first in `MODULES` in `build.js` (before `svg.js`). Exports: constants `BEAM_L` 4, `LOADED_L` 2, `W_MAX` 200, `W_STEP` 5, `W_SNAP` 10; `snapW(v)` (clamp, round to 5, |w| <= 10 goes to 0, non-finite goes to 0, never -0); `nextW(prev, raw, viaKeyboard)` (slider handler; a keyboard nudge that would stay in the zero zone while at 0 jumps to +-15 in the nudge direction); `loadAt(s, x)`; `equivalents(s)` returning `{rect, tri, comb, couple}` with signed F (+ down) and x from A (null when F is 0; `couple` true iff comb.F is 0 and a part is nonzero). 13 physics tests written first and seen to fail (module missing), then pass.
+
+### Decisions made
+- The combined location sums moments about A with the triangle's moment written `t*L*L/3` (peak B) or `t*L*L/6` (peak A), which equals F_tri * x_tri but keeps the brief's exact cases exact (r=100, t=-195, B gives x = -12 with `assert.equal`, not a tolerance).
+- `+ 0` on each F so a computed -0 becomes +0 (an extra test feeds `r: -0, t: -0`).
+- `nextW` treats only finite, nonzero `raw` as a nudge; the direction is the sign of `raw` since prev is 0 in that branch.
+
+### Problems encountered
+- None. Top-level names in physics.js are all exported constants/functions, so the build's duplicate-name check is satisfied.
+
+### Open questions / next steps
+- Task 3 onward import from `physics.js`; format.js's locWords also needs `BEAM_L` (controller ruling).
+- Sources: design `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; plan `docs/superpowers/plans/2026-10-20-distributed-load-beam.md`.
+
 ## 2026-10-20 - Task 1: scaffold, build script and empty page
 
 ### Summary
