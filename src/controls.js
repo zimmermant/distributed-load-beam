@@ -12,12 +12,11 @@ function controlsSetText(node, str) {
   if (node.textContent !== str) node.textContent = str;
 }
 
-// root: the controls container (holds the two zero labels, class zero-label, r then t).
-// parts: { rSlider, tSlider, peakA, peakB, rReadout, tReadout } -- the page's elements.
+// root: the controls container (key and pointer events are heard here).
+// parts: { rSlider, tSlider, peakA, peakB, rReadout, tReadout, rZero, tZero } -- the page's elements.
 // Binds the sliders and the peak buttons to state; render(s) shows state s in them.
 export function createControls(root, state, parts) {
-  const { rSlider, tSlider, peakA, peakB, rReadout, tReadout } = parts;
-  const zeroLabels = root.getElementsByClassName('zero-label');
+  const { rSlider, tSlider, peakA, peakB, rReadout, tReadout, rZero, tZero } = parts;
   let viaKeyboard = false;
 
   function showSlider(slider, readout, zeroLabel, text, value, zero) {
@@ -35,18 +34,21 @@ export function createControls(root, state, parts) {
 
   function render(s) {
     const v = controlsView(s);
-    showSlider(rSlider, rReadout, zeroLabels[0], v.rText, s.r, v.rZero);
-    showSlider(tSlider, tReadout, zeroLabels[1], v.tText, s.t, v.tZero);
+    showSlider(rSlider, rReadout, rZero, v.rText, s.r, v.rZero);
+    showSlider(tSlider, tReadout, tZero, v.tText, s.t, v.tZero);
     showPeak(peakA, v.peak === 'A');
     showPeak(peakB, v.peak === 'B');
   }
 
   // A key marks the NEXT input event as a keyboard one; that event clears the mark. A key that
-  // changes nothing (a slider already at its end) fires no input, so a key release and a
-  // pointer press clear it too, or the next drag would be taken for a key press.
+  // changes nothing (a slider already at its end) fires no input, so a key release, a pointer
+  // press and losing focus clear it too, or the next drag would be taken for a key press.
+  const clearKey = () => { viaKeyboard = false; };
   root.addEventListener('keydown', (e) => { if (CONTROLS_KEYS.includes(e.key)) viaKeyboard = true; });
-  root.addEventListener('keyup', () => { viaKeyboard = false; });
-  root.addEventListener('pointerdown', () => { viaKeyboard = false; });
+  root.addEventListener('keyup', clearKey);
+  root.addEventListener('pointerdown', clearKey);
+  root.addEventListener('focusout', clearKey);
+  if (typeof window !== 'undefined') window.addEventListener('blur', clearKey);
 
   function onInput(set) {
     const kb = viaKeyboard;

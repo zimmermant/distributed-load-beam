@@ -1,5 +1,21 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 7 fix round 1: fit the 800x750 viewport budget
+
+### Summary
+Controller measured the Task 7 page at 800x750: figure 760x443, controls bottom 775 (second peak button cut off), page 786 tall. Fixed in CSS/template: figure max-width 740; h1 20px/1.2, body padding 6; `#from-link` is now one small unboxed 13px line under the h1; the two peak buttons share one row (icon 24x13, labels `zero at A, peak at B` / `zero at B, peak at A`, text wraps inside the button if the column is narrow); tighter slider block (26px input, 2px padding), panel padding 6px 12px, calc text 13px/1.4; columns `1.25fr 1fr` from 700px so the buttons fit in one row at 800. The controls/calculation row is `position: sticky; bottom: 0` (opaque white, top border and shadow) from 700px up to the two-column breakpoint. Also: leading negative term in the combined sum is parenthesised (`F = (−400) + (100)`), `s.peak` is clamped to A/B before it reaches innerHTML, zero labels got ids `r-zero`/`t-zero` and are passed in `parts`, keyboard flag also cleared on `focusout` and window blur, and `test/controls.test.js` now pins the DOM wiring with a stub DOM.
+
+### Decisions made
+- Two-column breakpoint 1150px, computed: figure 740 + gap 20 + right column 340 + body padding 32 = 1132, plus up to 15 for a scrollbar (media queries count it) = 1147, rounded up to 1150; `.page` max-width 1100. At the old 1100 the figure was 708-719 px (< the 720 px needed for 12 px text). A template test pins the arithmetic.
+- Sticky row only from 700px (a sticky ~500 px stack on a phone width would cover the screen; phones are out of scope).
+- Estimated heights at 800x750 with a one-line note (not measured): body padding 6 + h1 24 + note 19 + figure 432 = 481; row padding 6 -> panels start about 487; controls about 206 tall (bottom about 693); calculation worst case (couple, or the off-beam r=100,t=-190 line) about 220-250 (bottom about 710-737). Controller to measure.
+
+### Problems encountered
+- Two peak buttons side by side need about 350 px of content width; at `1fr 1fr` the left column offered 334, hence `1.25fr 1fr`.
+
+### Open questions / next steps
+- Controller re-measures: #controls and #calc bottoms <= 745 at 800x750 with a preset note; no horizontal scroll; at 1280x720 figure and right column visible; figure >= 740 px wide at >= 800 px page width (and at 1150-1280).
+
 ## 2026-10-20 - Task 7: panel, controls, page, wiring
 
 ### Summary

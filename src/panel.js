@@ -21,10 +21,11 @@ function panelRect(d, s) {
 }
 
 function panelTri(d, s) {
+  const peak = s.peak === 'A' ? 'A' : 'B';          // never raw text into innerHTML
   const name = '<span class="c-tri"><b>Triangle</b></span>';
   if (d.tri.F === 0) return `${name}: peak = 0, so there is no triangular load and no force from it.`;
   return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t)} × ${fmt(LOADED_L)} = <b>${fmt(d.tri.F)} N</b>, ` +
-    `acting one third of the way in from the larger end (the peak is at ${s.peak}): x = ${fmtFixed(d.tri.x)} m`;
+    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)} m`;
 }
 
 // A word when the combined force acts off the beam (judged on the printed value).
@@ -44,7 +45,7 @@ function panelNeedsExact(d) {
 
 function panelComb(d) {
   const name = '<span class="c-comb"><b>Combined</b></span>';
-  const sum = `F = ${fmt(d.rect.F)} + (${fmt(d.tri.F)}) = <b>${fmt(d.comb.F)} N</b>`;
+  const sum = `F = ${panelPar(d.rect.F)} + (${fmt(d.tri.F)}) = <b>${fmt(d.comb.F)} N</b>`;
   if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so there is no combined force.`;
   if (d.comb.F === 0) return `${name}: ${sum}: the two parts cancel, so no single force replaces them.`;
   if (d.rect.F === 0 || d.tri.F === 0) {

@@ -115,3 +115,22 @@ test('createPanel writes the lines and touches the DOM only when the text change
   panel.render({ r: 100, t: 105, peak: 'B' });
   assert.equal(writes, 2);
 });
+
+test('a negative leading term in the combined sum is parenthesised: r=-200,t=100', () => {
+  const s = { r: -200, t: 100, peak: 'B' };
+  const comb = text(s, 'comb');
+  assert.ok(comb.includes('F = (−400) + (100) = −300 N'), comb);
+  assert.ok(comb.includes('/ (−300)'), comb);
+  assert.ok(text(s, 'rect').includes('F = w × L = (−200) × 2 = −400 N'));
+  // no bare "−digit" sits after an operator or at the start of a term in any combined sum
+  for (const r of [-200, -15, 15, 200]) for (const t of [-200, -15, 15, 200]) {
+    const p = text({ r, t, peak: 'A' }, 'comb');
+    assert.ok(!/([+×/]\s|F = )−\d/.test(p), `${r},${t}: ${p}`);
+  }
+});
+
+test('a bad peak value never reaches the HTML raw', () => {
+  const html = calcLines({ r: 100, t: 100, peak: '<img src=x>' }).map(l => l.html).join('');
+  assert.ok(!html.includes('<img'), html);
+  assert.ok(text({ r: 100, t: 100, peak: '<img src=x>' }, 'tri').includes('the peak is at B'));
+});

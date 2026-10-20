@@ -20,7 +20,7 @@
     <div class="zs">
       <i class="zt"></i>
       <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
-      <div class="zl"><span>−200 (up)</span><span class="zero-label">0</span><span>+200 (down)</span></div>
+      <div class="zl"><span>−200 (up)</span><span id="r-zero" class="zero-label">0</span><span>+200 (down)</span></div>
     </div>
   </div>
   <div class="ctl">
@@ -28,14 +28,14 @@
     <div class="zs">
       <i class="zt"></i>
       <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
-      <div class="zl"><span>−200 (up)</span><span class="zero-label">0</span><span>+200 (down)</span></div>
+      <div class="zl"><span>−200 (up)</span><span id="t-zero" class="zero-label">0</span><span>+200 (down)</span></div>
     </div>
   </div>
   <div class="peak">
     <div id="peak-label" class="peak-q">Which end comes to a point (w = 0)?</div>
     <div class="peak-row" role="group" aria-labelledby="peak-label">
-      <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A (wall), peak at B</span></button>
-      <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A (wall)</span></button>
+      <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A, peak at B</span></button>
+      <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A</span></button>
     </div>
   </div>
 </section>

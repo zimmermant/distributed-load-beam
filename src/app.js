@@ -16,7 +16,9 @@ function appStart() {
     peakA: document.getElementById('peak-a'),
     peakB: document.getElementById('peak-b'),
     rReadout: document.getElementById('r-readout'),
-    tReadout: document.getElementById('t-readout')
+    tReadout: document.getElementById('t-readout'),
+    rZero: document.getElementById('r-zero'),
+    tZero: document.getElementById('t-zero')
   });
 
   // Presets from the link apply once, before the first render. Only the fields the link set.

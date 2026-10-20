@@ -8,6 +8,7 @@ import { W_MAX, W_STEP } from '../src/physics.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const template = readFileSync(join(here, '..', 'src', 'index.template.html'), 'utf8');
 const appJs = readFileSync(join(here, '..', 'src', 'app.js'), 'utf8');
+const css = readFileSync(join(here, '..', 'src', 'styles.css'), 'utf8');
 
 test('the page declares both inline markers and loads nothing external', () => {
   assert.ok(template.includes('<!--INLINE_CSS-->'), 'missing <!--INLINE_CSS-->');
@@ -65,4 +66,24 @@ test('the figure and the controls are both in the page and the calculation panel
 test('app.js: the From the link line is written with textContent, never innerHTML', () => {
   assert.ok(/textContent/.test(appJs), 'app.js should set #from-link with textContent');
   assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(appJs), 'app.js must not build HTML');
+});
+
+test('the zero labels have ids that app.js looks up', () => {
+  for (const id of ['r-zero', 't-zero']) {
+    assert.match(template, new RegExp(`id="${id}" class="zero-label"`));
+    assert.ok(appJs.includes(`getElementById('${id}')`), id);
+  }
+});
+
+// Viewport budget arithmetic: the figure must stay >= 740 px wide wherever the page is >= 800 px wide
+// (text >= 12 px needs figure >= 720), including at the two-column breakpoint.
+test('figure max-width is 740 and the two-column breakpoint leaves it 740 px wide', () => {
+  assert.match(css, /\.fig-col \{ max-width: 740px;/);
+  const widths = [...css.matchAll(/@media \(min-width: (\d+)px\)/g)].map(m => Number(m[1]));
+  assert.ok(widths.includes(700), 'a 700 px breakpoint');
+  const col = Math.max(...widths);
+  const need = 740 + 20 + 340 + 32 + 15;   // figure + gap + right column + body padding + a scrollbar
+  assert.ok(col >= need, `two-column breakpoint ${col} < ${need}`);
+  assert.match(css, /grid-template-columns: minmax\(0, 740px\) 340px/);
+  assert.match(css, /position: sticky; bottom: 0/);
 });
