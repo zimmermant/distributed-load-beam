@@ -17,7 +17,7 @@ Todd asked: "On the three beam diagrams on the bottom, include a dotted outline 
 
 ### Open questions / next steps
 - Controller: look at the three columns (default, a sign-changing state such as r = 100, t = -200, peak B, and r = -100), and run the harness at 1280x720, 800x750, 1000x700; expect `violations: []`, `flagged: true`, `outlineTotal` about 500.
-- Sources: `.superpowers/sdd/2026-10-20-distributed-load-beam/outline-brief.md`; spec section "The equivalent forces" in `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; mutation run `docs/superpowers/mutation-coverage-run.txt`.
+- Sources: the approved in-chat design (kept in the git-ignored SDD workspace); spec section "The equivalent forces" in `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; mutation run `docs/superpowers/mutation-coverage-run.txt`.
 
 ## 2026-10-20 - Final-review fix wave: "near the wall", hygiene, harness pair, doc fixes
 

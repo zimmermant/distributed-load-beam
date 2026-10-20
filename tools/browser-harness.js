@@ -38,7 +38,7 @@
   const DEFAULTS = { r: 100, t: 100, peak: 'B' };
   const EXPECTED_COMBOS = 9 * 9 * 2 + 7 * 2;   // 176: the grid plus the 7 near-cancel / near-wall pairs, both peaks
   const MIN_TEXTS = 20, MIN_GS = 20;   // non-vacuity floors: a checker that finds nothing to measure proves nothing
-  const MIN_OUTLINES = 400;            // sweep floor: 160 of the 176 combos draw >= 3 dotted outlines (only r = t = 0 draws none)
+  const MIN_OUTLINES = 400;            // sweep floor: 142 of the 176 combos draw >= 3 dotted outlines, 32 draw 2 and 2 draw none; the real total is about 528, so 400 is a safe floor
   // Column geometry for check 9, the same numbers as COLS, BEAM_H and LOADED_L in src/layout.js
   // (test/layout.test.js reads this file and fails if they drift apart).
   const COLS_X = [20, 330, 640], COLS_OFFSET = 30, COLS_PX = 60, COLS_BEAM_Y = 424, COLS_BAND = 108, BEAM_H = 24, LOADED_L = 2;
