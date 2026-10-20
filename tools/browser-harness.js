@@ -32,9 +32,10 @@
   const MIN_FIG_PX = 600;
   const MIN_TEXT_PX = 12;
   const GRID = [-200, -150, -100, -15, 0, 15, 100, 150, 200];
-  const NEAR_CANCEL = [[100, -190], [100, -195], [100, -200], [-100, 190], [-100, 195], [-100, 200]];
+  // near-cancel pairs, plus [-130, 190] whose combined force is at x = 0.10 m (the 'near the wall' text, no arrow)
+  const NEAR_CANCEL = [[100, -190], [100, -195], [100, -200], [-100, 190], [-100, 195], [-100, 200], [-130, 190]];
   const DEFAULTS = { r: 100, t: 100, peak: 'B' };
-  const EXPECTED_COMBOS = 9 * 9 * 2 + 6 * 2;
+  const EXPECTED_COMBOS = 9 * 9 * 2 + 7 * 2;   // 176: the grid plus the 7 near-cancel / near-wall pairs, both peaks
   const MIN_TEXTS = 20, MIN_GS = 20;   // non-vacuity floors: a checker that finds nothing to measure proves nothing
 
   let fig = null, ui = null;

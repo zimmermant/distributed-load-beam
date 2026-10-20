@@ -1,5 +1,21 @@
 # Lab Notebook
 
+## 2026-10-20 - Final-review fix wave: "near the wall", hygiene, harness pair, doc fixes
+
+### Summary
+A. `format.js` gains `wallWord(x)` ('' / 'at the wall' / 'near the wall', judged on the PRINTED value); `locWords` uses it (never together with 'off the beam'), so r=-130, t=190, peak B (x = 0.0952) reads `at x = 0.10 m from A (near the wall)` and -0.001 reads `... 0.00 m ... (at the wall)`. `panelWhere` adds the matching `(at the wall: no arrow is drawn)` / `(near the wall: no arrow is drawn)` so the figure and the calculation agree. The arrow rule (null for x < `WALL_CLEAR_M`) is unchanged. Tests: format (locWords, wallWord), scene (x = 0.10 case), panel (both strings and agreement with locWords). B. The one absolute local path in this notebook is now `../torque_i_beam`; a grep of README, notebook, src, test, tools, build.js, package.json and dist for `<local path>/`, `cloud-synced folder` and email-like strings is clean (before the machine note below was added). C. README Develop section says "use a working Node 20+" (always pass a glob to `--test`). D. The harness sweeps one more pair, [-130, 190] (the near-wall text path): combos are now 9*9*2 + 7*2 = 176 (the earlier entries below say 174, which was true then). E. `svg.js text()` defaults to 16 (was 14). F. `build.js` comment no longer names the sibling app's file. G. A template test ties the template viewBox, layout.js `VB` and the harness's `const VB` together (harness read as text; `tools/mutations.mjs` now copies `tools/` into its temp copy so that test can read it). H. README: keyboard bullet, fourth example link (r=-75, t=150, peak A cancels: a couple), frame-busting sentence, harness paragraph (four probes, 176).
+
+### Decisions made
+- "At the wall" only where the location prints 0.00 m; "near the wall" for the rest of 0 <= x < 0.12 m. Longest column line is `at x = 0.10 m from A (near the wall)` (36 characters, inside the verified 37-character budget).
+- Tiny arrows for forces of a few newtons (about 5 N) are kept on purpose: the fixed scale never changes, and the text carries the value.
+- Machine note (one developer's environment, kept out of the README): on this Mac Homebrew's `node` is broken; use `/opt/homebrew/Cellar/node@22/22.23.2_1/bin/node` and always run `--test test/*.test.js` with a glob, never a directory.
+
+### Problems encountered
+- The mutation tool's rows for the old `locWords` wording no longer matched; they were rewritten for `wallWord` / `locWords` / `panelWhere` (new rows: never at, never near, bound `<=`, left of the wall, unrounded at/near, wall note dropped, order of notes, panel note dropped and always shown).
+
+### Open questions / next steps
+- Controller re-runs the browser harness (176 combos) at 1280x720, 800x750, 1000x700 and checks the near-wall column text fits.
+
 ## 2026-10-20 - Task 10 / whole build: README, final check, summary of the distributed-load beam
 
 ### Summary
@@ -275,4 +291,4 @@ Started a new teaching simulation, `distributed_load_beam`, for PHYS 291 Statics
 
 ### Sources
 - Mockup: `docs/superpowers/specs/2026-10-20-distributed-load-mockup.html`
-- Pattern followed: `<local path>` (live: https://zimmermant.github.io/torque-i-beam/)
+- Pattern followed: `../torque_i_beam` (live: https://zimmermant.github.io/torque-i-beam/)

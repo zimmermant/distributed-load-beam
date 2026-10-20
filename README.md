@@ -23,7 +23,7 @@ A is at x = 0 (the wall), B at x = 2 m, C at x = 4 m, with x measured from A. On
 Details that are easy to miss:
 
 - **Snap to zero.** A slider value within ±10 N/m of zero becomes exactly 0, so the first non-zero values are ±15. A green tick marks the centre of each scale and its "0" label lights up while the value is 0.
-- **Keyboard nudge.** One arrow-key step (5) is smaller than the snap zone, so a slider sitting at 0 could never leave it. A key press that would land back in the zone jumps straight to +15 or −15, in the direction of the key. A pointer drag just snaps.
+- **Keyboard nudge.** One arrow-key step (5) is smaller than the snap zone, so a slider sitting at 0 could never leave it. From 0, an arrow key jumps straight to +15 or −15. From ±15 the next key toward zero lands on 0. A pointer drag just snaps.
 - Every control visibly responds to hover, press, keyboard focus and selection.
 
 The defaults are r = 100 N/m, t = 100 N/m, peak at B.
@@ -45,7 +45,8 @@ When there is no arrow, the text under the figure says why:
 - **A part that is zero** has no force and no location ("no load of this kind").
 - **The combined force has no location only when F is exactly 0.** If both parts are non-zero that is a **couple**: equal and opposite forces at different places, which no single force can replace. The page says so ("the parts cancel: no single force") and adds a short note in the calculation. If both parts are zero it simply says "no load".
 - **The combined force can land off the beam** when opposite loads nearly cancel (for example r = 100, t = −190, peak B puts x̄ at −5.33 m, left of the wall; r = 100, t = −195, peak A puts it at 14.00 m, beyond C). No arrow is drawn, and the text says "(off the beam)". The calculation says whether that is left of the wall or beyond C.
-- **A force within 0.12 m of the wall** (0 ≤ x̄ < 0.12 m, `WALL_CLEAR_M` in `src/physics.js`) is not drawn either, because the arrow head would overlap the wall. The text reads "at x = 0.00 m from A (at the wall)". Example: r = 100, t = −150, peak B gives 50 N down at x̄ = 0.
+- **A force within 0.12 m of the wall** (0 ≤ x̄ < 0.12 m, `WALL_CLEAR_M` in `src/physics.js`) is not drawn either, because the arrow head would overlap the wall. The text says "(at the wall)" when the location prints as 0.00 m and "(near the wall)" for the rest of that zone, and the calculation adds "no arrow is drawn". Examples: r = 100, t = −150, peak B gives 50 N down at x̄ = 0.00 m ("at the wall"); r = −130, t = 190, peak B gives 70 N up at x̄ = 0.10 m ("near the wall").
+- **A very small force** (a few newtons) is still drawn to the same fixed scale, so its arrow can be a short sliver. That is deliberate: the scale never changes, and the text under the figure carries the value.
 
 Nothing here is stored: the state is only `r`, `t` and `peak`, and everything else is computed from them.
 
@@ -71,12 +72,12 @@ Worked example links (shown relative to the page; put the `?...` part after `dis
 distributed_load_beam.html?r=100&t=100&peak=B      # the defaults, written out
 distributed_load_beam.html?r=100&t=-200&peak=B     # the parts cancel: F = 0, a couple, no single force
 distributed_load_beam.html?r=100&t=-150&peak=B     # combined 50 N down at the wall: no arrow, text says "at the wall"
-distributed_load_beam.html?r=-75&t=150&peak=A      # upward rectangle under a downward triangle peaking at the wall
+distributed_load_beam.html?r=-75&t=150&peak=A      # equal and opposite parts (−150 N and +150 N): another couple
 ```
 
 ## Embedding in another page
 
-The page sends no `X-Frame-Options` or CSP header and has no frame-busting code, so it can sit in an iframe (for example in a Canvas page):
+The page contains no frame-busting code and sets no frame-blocking meta tag; the host's response headers decide the rest (GitHub Pages sends none). So it can sit in an iframe (for example in a Canvas page):
 
 ```html
 <iframe src="https://…/distributed_load_beam.html?r=100&t=-100&peak=B" width="100%" height="750" style="border:0; max-width:800px" title="Distributed load on a beam" loading="lazy"></iframe>
@@ -99,10 +100,10 @@ The budgets drove the layout, and the numbers matter if you change the CSS (`src
 ## Develop
 
 ```bash
-export NODE=/opt/homebrew/Cellar/node@22/22.23.2_1/bin/node   # Homebrew's `node` is broken on this machine
-$NODE --test test/*.test.js        # always a glob: `node --test test/` misreports here
-$NODE build.js                     # writes dist/distributed_load_beam.html
-$NODE tools/mutations.mjs --coverage --strict
+# use a working Node 20+ (always pass a glob to --test, never a directory)
+node --test test/*.test.js         # the unit tests
+node build.js                      # writes dist/distributed_load_beam.html
+node tools/mutations.mjs --coverage --strict
                                    # breaks one thing at a time; the suite must fail each time, and
                                    # every test must fail under at least one break (a test with no
                                    # demonstrated teeth exits 1). Runs on a temporary copy, never
@@ -115,14 +116,14 @@ $NODE tools/mutations.mjs --coverage --strict
 2. Open `http://127.0.0.1:8742/dist/distributed_load_beam.html` in a browser sized **800 × 750** (then reload so the layout settles).
 3. In the browser's JavaScript console: `eval(await (await fetch('/tools/browser-harness.js')).text()); H.all()`
 
-A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 174 combinations and reports `violations: []` (no text touching text, a graphic, the viewBox edge or an arrow over the wall; every text at least 12 px); `sensitivity` reports `flagged: true` (it plants an overlap, a clipped text and a tiny text and requires each to be named, then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky row does not cover the figure). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
+A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 176 combinations (the 9 × 9 grid of r and t, plus near-cancelling and near-wall pairs, for both peaks) and reports `violations: []` (no text touching text, a graphic, the viewBox edge or an arrow over the wall; every text at least 12 px); `sensitivity` reports `flagged: true` (it plants four faults and requires each to be named: a text on the beam, a text on another text, a text running past the viewBox edge, and a size-10 text; then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky row does not cover the figure). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
 
 ## Layout of the code
 
 | Module | Job |
 |---|---|
 | `physics.js` | Constants (beam, range, step, snap zone, `WALL_CLEAR_M`), `snapW`, `nextW` (the keyboard jump), `loadAt`, `equivalents`. |
-| `format.js` | The only place a number is rounded for display: `fmt`, `fmtFixed` (locations, always two decimals), `forceWords`, `locWords`. |
+| `format.js` | The only place a number is rounded for display: `fmt`, `fmtFixed` (locations, always two decimals), `forceWords`, `locWords`, `wallWord`. |
 | `svg.js` | `el` / `clear` / `text` helpers and the colour palette. |
 | `state.js` | The store: three stored values (`r`, `t`, `peak`); everything else is `derive()`d. |
 | `presets.js` | URL presets: `parsePresets` and `describePresets`. Held outside the state. |
