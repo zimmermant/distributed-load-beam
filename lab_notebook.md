@@ -1,0 +1,33 @@
+# Lab Notebook
+
+## 2026-10-20 - Design brainstorm for the distributed-load beam
+
+### Summary
+Started a new teaching simulation, `distributed_load_beam`, for PHYS 291 Statics: a 4 m horizontal beam fixed to a wall at A, with B at the midpoint and C at the tip. Only half AB is ever loaded, with a rectangular and a triangular distributed load (each positive or negative; the triangle's peak at either end of AB). The app computes and shows the equivalent force (size and location) of the rectangular part, the triangular part and the combined load, with the arithmetic written out. Brainstormed with Todd, iterated a working mockup three times in the browser, and wrote the design document `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md` (status: draft awaiting review). No application code exists yet.
+
+### Decisions made (by Todd)
+- Purpose: students adjust the loading and see how the equivalent force and its location change, and how they are calculated.
+- Direction of the triangle means which end comes to a point (w = 0), i.e. which end has the peak; magnitudes may be positive or negative.
+- Each slider has its zero marked and snaps to zero when close.
+- Only AB is loaded, to simplify the simulation (BC has no loading at all). Beam fixed at 4 m.
+- Labels, arrows and the figure must not overlap.
+
+### Decisions made (my calls, flagged in the design document)
+- Slider range +-200 N/m, step 5, snap within +-10; + is down.
+- Three one-arrow rows for the equivalent forces, so overlap is impossible by construction; fixed force scale (no auto-rescale).
+- Controls must stay visible beside the figure on wide windows (the mockup stacked them, which fails that).
+- Optional URL presets `r`, `t`, `peak`, as in torque_i_beam; no locking.
+
+### Problems encountered
+- First mockup clipped the lower figure, overlapped the legend with labels, and drew downward forces as upward arrows. Fixed in v2.
+- Fixed-scale arrows for small forces were nearly invisible at +-300 N/m; narrowed to +-200 and enlarged the scale.
+- Overlap was verified by a script over 242 slider combinations (zero violations), and the script was shown to catch a planted overlap.
+- A near-cancelling pair can put the combined force off the beam (w_r = 100, w_t = -190, peak at B gives 10 N down at x = -5.33 m); the design handles it ("off the beam", no arrow).
+
+### Open questions / next steps
+- Todd to review the design document; then the implementation plan (writing-plans), then execution.
+- Publishing to GitHub Pages only on Todd's go-ahead, following torque_i_beam.
+
+### Sources
+- Mockup: `docs/superpowers/specs/2026-10-20-distributed-load-mockup.html`
+- Pattern followed: `<local path>` (live: https://zimmermant.github.io/torque-i-beam/)
