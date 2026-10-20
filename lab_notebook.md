@@ -1,5 +1,24 @@
 # Lab Notebook
 
+## 2026-10-20 - Dotted outline of the load in each equivalent-force column (Todd's request)
+
+### Summary
+Todd asked: "On the three beam diagrams on the bottom, include a dotted outline for the loading." Each of the three bottom columns now draws, behind its force arrow, a dotted unfilled outline of the load that column's force replaces: the rectangle w = r (blue), the triangle (orange), and the net load w(x) = r + t*f(x) (green; a trapezoid, or two triangles on opposite faces when w changes sign inside AB, split at xc = L*w(0)/(w(0) - w(L))). New pure `columnOutline(k, s)` in `src/layout.js` (helpers `layoutPiece`, `layoutNet`); `src/scene.js` draws each polygon as a `<path class="g outline">` (stroke-dasharray "2 4", width 1.8, round caps, fill none, column colour) after the column's beam copy and before its arrow. Tests 156 -> 168 (6 added to `test/layout.test.js`, including a drift test between the harness constants and `COLS`; 6 to `test/scene.test.js`); mutation rows 313 -> 335, all caught, 168 of 168 tests covered (full run saved in `docs/superpowers/mutation-coverage-run.txt`). `tools/browser-harness.js` gains check (9) and two outline probes; `dist/` rebuilt (40.3 KB). Commits: 9fbe91b (feature + harness), 474dfa7 (mutation rows and run).
+
+### Decisions made
+- **Same vertical scale as the top figure** (`TOP.unit`, 0.2 units per N/m), so max stacked 400 N/m = 80 units fits the column band (108) and never reaches the column text lines; the outline spans AB only and sits on the face the load pushes from (above for w > 0, below for w < 0). Zero load draws nothing.
+- **The arrow inside its outline is intended** (the arrow replaces the load at its centroid); only text-vs-graphic overlap is a defect, and the harness's existing check (3) already guards labels against `.outline` because it is a top-level `.g`.
+- A zero-height end contributes no point, so a piece with a zero end is a triangle, never a degenerate polygon; the same signed expression `base - w*unit` gives both faces.
+- Harness check (9) hard-codes the column geometry (the built page has no module access); `test/layout.test.js` reads the harness and fails if the constants drift from `COLS`, `BEAM_H`, `LOADED_L`.
+
+### Problems encountered
+- None in the implementation; the new rows needed no narrowing (all fail 1-5 tests). The existing `unit: 0.3` and `band: 60` rows still stay under the 12-test limit with the new tests.
+- Not verified here (no browser available to the implementer): how the dots look, and the harness run (check 9, `sensitivity().flagged` with the two new probes, `outlineTotal` >= 400).
+
+### Open questions / next steps
+- Controller: look at the three columns (default, a sign-changing state such as r = 100, t = -200, peak B, and r = -100), and run the harness at 1280x720, 800x750, 1000x700; expect `violations: []`, `flagged: true`, `outlineTotal` about 500.
+- Sources: `.superpowers/sdd/2026-10-20-distributed-load-beam/outline-brief.md`; spec section "The equivalent forces" in `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; mutation run `docs/superpowers/mutation-coverage-run.txt`.
+
 ## 2026-10-20 - Final-review fix wave: "near the wall", hygiene, harness pair, doc fixes
 
 ### Summary

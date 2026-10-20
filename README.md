@@ -40,6 +40,8 @@ L = 2 m throughout.
 
 Positive F points down. The three arrows share **one fixed scale** (the same length per newton for every force and every slider setting), so a bigger force is always a visibly longer arrow; nothing auto-rescales.
 
+In each of the three columns a **dotted outline of the load that column's force replaces** is drawn behind the arrow: the rectangle, the triangle, and the net load w(x) = r + t·f(x) (a trapezoid, or two triangles on opposite sides of the beam where the net load changes sign inside AB). It uses the same height scale as the top figure, spans AB only, sits on the face of the beam the load pushes from, and is absent when that load is zero. The arrow ends up inside its outline by design: it stands for the whole load at its centroid.
+
 When there is no arrow, the text under the figure says why:
 
 - **A part that is zero** has no force and no location ("no load of this kind").
@@ -116,7 +118,7 @@ node tools/mutations.mjs --coverage --strict
 2. Open `http://127.0.0.1:8742/dist/distributed_load_beam.html` in a browser sized **800 × 750** (then reload so the layout settles).
 3. In the browser's JavaScript console: `eval(await (await fetch('/tools/browser-harness.js')).text()); H.all()`
 
-A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 176 combinations (the 9 × 9 grid of r and t, plus near-cancelling and near-wall pairs, for both peaks) and reports `violations: []` (no text touching text, a graphic, the viewBox edge or an arrow over the wall; every text at least 12 px); `sensitivity` reports `flagged: true` (it plants four faults and requires each to be named: a text on the beam, a text on another text, a text running past the viewBox edge, and a size-10 text; then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky row does not cover the figure). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
+A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 176 combinations (the 9 × 9 grid of r and t, plus near-cancelling and near-wall pairs, for both peaks) and reports `violations: []` (no text touching text, a graphic, the viewBox edge or an arrow over the wall; every text at least 12 px; every dotted outline inside its column band); `sensitivity` reports `flagged: true` (it plants six faults and requires each to be named: a text on the beam, a text on another text, a text running past the viewBox edge, a size-10 text, and two dotted-outline paths outside their column band, one above it and one between the columns; then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky row does not cover the figure). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
 
 ## Layout of the code
 
@@ -140,7 +142,7 @@ A pass means every phase is clean: `install` finds the figure at least 600 px wi
 - **One rounding point.** Numbers reach the screen only through `fmt` / `fmtFixed` (forces whole, locations two decimals). `-0` is impossible by construction.
 - **One shared scope after inlining**, so every top-level name must be unique across modules. The build fails on a duplicate, and also on a column-0 statement that declares more than one name or destructures.
 - **Fixed force scale.** Arrow length is `fs × |F|`, with no per-state rescaling.
-- **Class contracts the browser harness relies on.** Every graphic drawn by `scene.js` carries class `g` (the wall and its hatching also `wall`; the A, B, C circles also `pc`); every text carries class `t` (letters inside the circles: `tin`); every SVG text is at least 16 units. Remove a class and the harness stops seeing that element.
+- **Class contracts the browser harness relies on.** Every graphic drawn by `scene.js` carries class `g` (the wall and its hatching also `wall`; the A, B, C circles also `pc`; the dotted load outlines also `outline`); every text carries class `t` (letters inside the circles: `tin`); every SVG text is at least 16 units. Remove a class and the harness stops seeing that element.
 - **Tests that scan HTML strip the tags first** (the markup carries `style` attributes with hyphens before digits), then look for `-0`, `NaN`, `Infinity` and a hyphen-minus before a digit.
-- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (313 rows; every row caught; all 156 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
+- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (335 rows; every row caught; all 168 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
 - **Link text never becomes markup.** The calculation is built only from numbers formatted by `fmt` / `fmtFixed` and fixed strings; the "From the link" line is set with `textContent`.
