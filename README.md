@@ -4,7 +4,7 @@ A teaching simulation. A 4 m beam is fixed to a wall at **A**. Only the half **A
 
 Open `dist/distributed_load_beam.html` in any browser. It is one self-contained file (about 37 KB): no server, no network, no external URL.
 
-There is **no published URL yet.** Publishing (a separate public repo and GitHub Pages, the way `../torque_i_beam` was done) is a later step that waits for the author's go-ahead. Wherever this README shows `https://…/`, that is a placeholder for the address the page will have once it is published.
+Live: https://zimmermant.github.io/distributed-load-beam/ (the root page redirects to the simulation, and the redirect drops any `?...` parameters, so a link with URL presets must point at `https://zimmermant.github.io/distributed-load-beam/dist/distributed_load_beam.html?r=100&t=-100&peak=B`). Source: https://github.com/zimmermant/distributed-load-beam
 
 ## The beam and the sign convention
 
@@ -68,7 +68,7 @@ Values are **snapped exactly as the sliders would snap them**: clamped to ±200,
 
 Presets apply **once, at load**. **Nothing is locked**: students can still move every control, and reloading the link restores the setup.
 
-Worked example links (shown relative to the page; put the `?...` part after `distributed_load_beam.html`, or after the placeholder address once published):
+Worked example links (shown relative to the page; put the `?...` part after `distributed_load_beam.html`, i.e. after `https://zimmermant.github.io/distributed-load-beam/dist/distributed_load_beam.html`):
 
 ```
 distributed_load_beam.html?r=100&t=100&peak=B      # the defaults, written out
@@ -82,10 +82,10 @@ distributed_load_beam.html?r=-75&t=150&peak=A      # equal and opposite parts (�
 The page contains no frame-busting code and sets no frame-blocking meta tag; the host's response headers decide the rest (GitHub Pages sends none). So it can sit in an iframe (for example in a Canvas page):
 
 ```html
-<iframe src="https://…/distributed_load_beam.html?r=100&t=-100&peak=B" width="100%" height="750" style="border:0; max-width:800px" title="Distributed load on a beam" loading="lazy"></iframe>
+<iframe src="https://zimmermant.github.io/distributed-load-beam/dist/distributed_load_beam.html?r=100&t=-100&peak=B" width="100%" height="750" style="border:0; max-width:800px" title="Distributed load on a beam" loading="lazy"></iframe>
 ```
 
-- **The address is a placeholder.** There is no published URL yet (see the top of this file).
+- **Use the full `dist/...` address.** The short root address redirects and drops the `?...` presets.
 - **Size.** The page is built to fit, with the whole figure and every control visible and no scrolling, in two budgets: **800 × 750** (an 800 px-wide Canvas iframe) and **1280 × 720** (a laptop browser). The snippet's `height="750"` and `max-width:800px` are those numbers.
 - **Phones are out of scope.** Nothing is promised or tested below 700 px wide; the page stacks, shrinks and scrolls there.
 - Presets work inside the frame (put the `?...` part on the `src`), and one page can hold several frames with different presets.
