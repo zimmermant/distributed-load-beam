@@ -1,5 +1,23 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 9: mutation audit with coverage run
+
+### Summary
+Added `tools/mutations.mjs` (ported from `../torque_i_beam/tools/mutations.mjs`): runs on a temporary copy of src/, test/, build.js, package.json; 309 rows over physics, format, state, presets, layout, scene, svg, panel, controls, app, the template, styles.css and build.js; `--coverage --strict`. Final run (`docs/superpowers/mutation-coverage-run.txt`): all 309 caught, 153 of 153 tests fail under at least one mutation. Report: `docs/superpowers/mutation-audit-report.md`. The first run left 100 rows uncaught; the tests were strengthened (not the rows): new `test/stub-dom.js`, `test/scene.test.js` (20), `test/app.test.js` (4), build.main refusal tests, plus additions to the state, presets, physics, panel, layout, controls, format and template tests (97 to 153 tests). No src change.
+
+### Decisions made
+- scene.js and app.js had no unit tests, so a stub DOM (no jsdom, no browser) was written and used for both; rendered classes, sizes, arrow geometry and text are now pinned in node.
+- Rows that fail more than 12 tests were narrowed (one peak or one sign) rather than raising the limit; four rows (minus sign constant, `fmt` hyphen, `W_STEP`, "r alone not committed") carry `{ max: 30 }` because the thing they break is used by that many tests.
+- "presets applied twice" (brief) has no row: `state.set` is idempotent, so it is not a behavioural break. Dead or redundant code found is listed in the report (snapW `+ 0`, combF `+ 0`, fmt null guard, forceWords dp, a NaN x is unguarded in forceArrow but unreachable).
+
+### Problems encountered
+- The Task 8 fix (WALL_CLEAR_M, `(at the wall)`) landed mid-task and changed layout.js and format.js text the rows matched; rows were updated and rows added for the new behaviour, and the final run is on the new tree.
+- Mutations of shared physics became too blunt once scene and app tests were added; narrowed as above.
+
+### Open questions / next steps
+- Controller: final browser verification and merge. The runner takes about 13 minutes.
+- Sources: brief `.superpowers/sdd/2026-10-20-distributed-load-beam/task-9-brief.md`; model `../torque_i_beam/tools/mutations.mjs` and its `docs/superpowers/mutation-audit-report.md`.
+
 ## 2026-10-20 - Task 8 fix round 1 (b): harness checks arrow vs wall, a real budget, more probes
 
 ### Summary

@@ -87,3 +87,8 @@ test('figure max-width is 740 and the two-column breakpoint leaves it 740 px wid
   assert.match(css, /grid-template-columns: minmax\(0, 740px\) 340px/);
   assert.match(css, /position: sticky; bottom: 0/);
 });
+
+test('the From the link line starts hidden and empty, and is a plain paragraph', () => {
+  assert.match(template, /<p id="from-link" hidden><\/p>/);
+  assert.match(css, /#from-link\[hidden\] \{ display: none; \}/);
+});

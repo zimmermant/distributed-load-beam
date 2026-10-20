@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdtempSync, rmSync, cpSync, appendFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { strip, scanForDuplicates, main, MODULES } from '../build.js';
 
 // build.js only calls main() when it is the program node was invoked on (see
@@ -183,4 +183,121 @@ test('every src/*.js file is listed in MODULES', () => {
   const files = readdirSync(join(here, '..', 'src')).filter(f => f.endsWith('.js')).sort();
   const missing = files.filter(f => !MODULES.includes(f));
   assert.deepEqual(missing, [], `src/ files missing from MODULES in build.js: ${missing.join(', ')}`);
+});
+
+// ---- main()'s refusals, against a scratch copy of the build (build.js, package.json, src/) ----
+// build.js reads src/ relative to itself, so a copy can be damaged freely. Each copy is imported by
+// its own path, so every one is a fresh module.
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+async function inCopy(edit, check) {
+  const dir = mkdtempSync(join(tmpdir(), 'distributed-load-beam-copy-'));
+  try {
+    for (const f of ['src', 'build.js', 'package.json']) cpSync(join(repoRoot, f), join(dir, f), { recursive: true });
+    edit(dir);
+    const copy = await import(pathToFileURL(join(dir, 'build.js')).href);
+    const out = join(dir, 'out');
+    return await check(() => copy.main(out), out);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+const addTo = (file, text) => (dir) => appendFileSync(join(dir, 'src', file), text);
+const rewrite = (file, from, to) => (dir) => {
+  const p = join(dir, 'src', file);
+  const before = readFileSync(p, 'utf8');
+  assert.ok(before.includes(from), `${file} lacks ${from}`);
+  writeFileSync(p, before.replace(from, () => to));
+};
+
+test('main() refuses a bundle that does not parse', async () => {
+  await inCopy(addTo('format.js', '\nconst BROKEN_BUNDLE = ;\n'), (run) => {
+    assert.throws(run, /does not parse as JavaScript/);
+  });
+});
+
+test('main() refuses a template that lost an inline marker, and writes nothing', async () => {
+  for (const marker of ['<!--INLINE_CSS-->', '<!--INLINE_JS-->']) {
+    await inCopy(rewrite('index.template.html', marker, ''), (run, out) => {
+      assert.throws(run, /missing one of its inline markers/);
+      assert.ok(!existsSync(join(out, 'distributed_load_beam.html')));
+    });
+  }
+});
+
+test('main() refuses an external URL, script tag or stylesheet in the page', async () => {
+  await inCopy(addTo('format.js', "\nexport const SOME_REMOTE = 'https://example.com/x.js';\n"), (run) => {
+    assert.throws(run, /an external URL is present/);
+  });
+  await inCopy(rewrite('index.template.html', '</head>', '<script src="x.js"></script></head>'), (run) => {
+    assert.throws(run, /an external script tag is present/);
+  });
+  await inCopy(rewrite('index.template.html', '</head>', '<link rel="stylesheet" href="x.css"></head>'), (run) => {
+    assert.throws(run, /an external stylesheet is present/);
+  });
+});
+
+test('main() refuses a page over 250 KB', async () => {
+  await inCopy(addTo('format.js', `\nexport const HUGE_TEXT = '${'x'.repeat(260_000)}';\n`), (run) => {
+    assert.throws(run, /over the 250 KB budget/);
+  });
+});
+
+test('main() notices an import or export line that survived strip (inside a template literal, which still parses)', async () => {
+  await inCopy(addTo('format.js', '\nexport const SURVIVOR = `first\nimport nothing\nexport nothing`;\n'), (run) => {
+    assert.throws(run, /an import statement survived[\s\S]*an export statement survived/);
+  });
+});
+
+test('main() splices CSS and JavaScript verbatim: $& and $$ in them are not replacement patterns', async () => {
+  const css = "/* dollars: $& $' $` $$ $1 */";
+  await inCopy((dir) => {
+    appendFileSync(join(dir, 'src', 'styles.css'), `\n${css}\n`);
+    appendFileSync(join(dir, 'src', 'format.js'), `\nexport const DOLLARS = '$& $$ $1';\n`);
+  }, (run, out) => {
+    run();
+    const html = readFileSync(join(out, 'distributed_load_beam.html'), 'utf8');
+    assert.ok(html.includes(css), 'the CSS arrived unchanged');
+    assert.ok(html.includes(`const DOLLARS = '$& $$ $1';`), 'the JavaScript arrived unchanged');
+  });
+});
+
+test('the built page wraps every module in one strict-mode function, in MODULES order', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'distributed-load-beam-build-d-'));
+  try {
+    main(dir);
+    const html = readFileSync(join(dir, 'distributed_load_beam.html'), 'utf8');
+    assert.ok(html.includes('<script>\n(function () {\n"use strict";\n'), 'opens an IIFE in strict mode');
+    assert.ok(html.includes('\n})();\n</script>'), 'closes it');
+    const at = MODULES.map(m => html.indexOf(`// ===== ${m} =====`));
+    assert.ok(at.every(i => i > 0));
+    assert.deepEqual([...at].sort((a, b) => a - b), at, 'modules appear in dependency order');
+    assert.ok(html.indexOf('<style>') < html.indexOf('<script>'));
+    assert.ok(!html.includes('<!--INLINE_'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('scanForDuplicates: a comma inside a string, a template or a comment is not a second declarator', () => {
+  for (const line of [
+    "export const MSG = 'a, b';",
+    'export const MSG2 = "a, b";',
+    'export const MSG3 = `a, b`;',
+    "export const MSG4 = 'it\\'s, fine';",
+    'export const MSG5 = 1;  // one, two'
+  ]) assert.doesNotThrow(() => scanForDuplicates(line + '\n', 'm.js', new Map()), line);
+  // a comma between two declarators is
+  assert.throws(() => scanForDuplicates('const a = 1, b = 2;\n', 'm.js', new Map()), /one name per statement/);
+  // a comma inside brackets, braces or a call is not
+  assert.doesNotThrow(() => scanForDuplicates('const f = g(1, 2);\n', 'm.js', new Map()));
+});
+
+test('strip: a relative import on one line, and the keywords of the declarations that follow, are handled together', () => {
+  const out = strip("import { a } from './a.js';\nexport function f() {}\n  export const nope = 1;\nexport { f };\nconst keep = 2;\n");
+  assert.ok(!/\bimport\b/.test(out));
+  assert.ok(out.includes('function f() {}'));
+  assert.ok(out.includes('const keep = 2;'));
+  assert.ok(!/\bexport\b/.test(out));
+  assert.ok(out.includes('  const nope = 1;'), 'an indented export keyword is stripped too');
 });

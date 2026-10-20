@@ -82,3 +82,12 @@ test('no forceWords/locWords result contains -0, NaN or Infinity', () => {
   }
   assert.equal(n, 81 * 81 * 2 * 3);
 });
+
+test('locWords: "at the wall" covers 0 <= x < 0.12 only; a tiny negative that prints 0.00 is neither at the wall nor off the beam', () => {
+  assert.equal(locWords(0.1199), 'at x = 0.12 m from A (at the wall)');
+  assert.equal(locWords(0.12), 'at x = 0.12 m from A');
+  assert.equal(locWords(0.5), 'at x = 0.50 m from A');
+  assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
+  assert.equal(locWords(-0.2), 'at x = −0.20 m from A (off the beam)');
+  assert.equal(locWords(-0.0049), 'at x = 0.00 m from A');
+});

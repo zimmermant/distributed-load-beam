@@ -113,3 +113,46 @@ test('derive(getState()) deep-equals equivalents(getState())', () => {
   st.set({ r: -50, t: 120, peak: 'A' });
   assert.deepEqual(derive(st.getState()), equivalents(st.getState()));
 });
+
+test('a subscriber that changes the state it receives cannot corrupt the store', () => {
+  const st = createState();
+  st.subscribe((s) => { s.r = 999; s.peak = 'Z'; });
+  st.setR(50);
+  assert.deepEqual(st.getState(), { r: 50, t: 100, peak: 'B' });
+  st.setT(60);
+  assert.deepEqual(st.getState(), { r: 50, t: 60, peak: 'B' });
+});
+
+test('a partial batch keeps every field it does not name', () => {
+  const st = createState();
+  st.set({ r: 40, t: -60, peak: 'A' });
+  st.set({ t: 20 });
+  assert.deepEqual(st.getState(), { r: 40, t: 20, peak: 'A' });
+  st.set({ r: -80 });
+  assert.deepEqual(st.getState(), { r: -80, t: 20, peak: 'A' });
+  st.set({});
+  assert.deepEqual(st.getState(), { r: -80, t: 20, peak: 'A' });
+  st.set();
+  assert.deepEqual(st.getState(), { r: -80, t: 20, peak: 'A' });
+});
+
+test('every one of r, t and peak is committed on its own', () => {
+  const st = createState();
+  let calls = 0;
+  st.subscribe(() => { calls++; });
+  st.setR(50);
+  st.setT(50);
+  st.setPeak('A');
+  assert.equal(calls, 3);
+  assert.deepEqual(st.getState(), { r: 50, t: 50, peak: 'A' });
+});
+
+test('reset restores every field, including the peak and the rectangle', () => {
+  const st = createState();
+  st.set({ r: -50, t: 0, peak: 'A' });
+  st.reset();
+  assert.deepEqual(st.getState(), { r: 100, t: 100, peak: 'B' });
+  st.setR(0);
+  st.reset();
+  assert.equal(st.getState().r, 100);
+});

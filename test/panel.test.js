@@ -134,3 +134,28 @@ test('a bad peak value never reaches the HTML raw', () => {
   assert.ok(!html.includes('<img'), html);
   assert.ok(text({ r: 100, t: 100, peak: '<img src=x>' }, 'tri').includes('the peak is at B'));
 });
+
+test('each line sits in a div carrying its key as a class', () => {
+  let html = '';
+  const el = { get innerHTML() { return html; }, set innerHTML(v) { html = v; } };
+  createPanel(el).render({ r: 100, t: -200, peak: 'B' });
+  for (const key of ['rect', 'tri', 'comb', 'note']) assert.ok(html.includes(`<div class="cl ${key}">`), `${key}: ${html}`);
+  createPanel(el).render({ r: 100, t: 100, peak: 'B' });
+  assert.ok(!html.includes('class="cl note"'));
+});
+
+test('a combined force beyond C is flagged, and one left of the wall is flagged differently', () => {
+  assert.ok(text({ r: 100, t: -190, peak: 'A' }, 'comb').includes('7.33 m (off the beam, beyond C)'));
+  const left = text({ r: 100, t: -190, peak: 'B' }, 'comb');
+  assert.ok(left.includes('(off the beam, left of the wall)') && !left.includes('beyond C'), left);
+  const on = text({ r: 100, t: 100, peak: 'B' }, 'comb');
+  assert.ok(!/off the beam/.test(on), on);
+});
+
+test('off the beam is judged on the printed location: -0.001 and 4.003 print 0.00 and 4.00 and are on the beam', () => {
+  // off-grid loads, so the combined location lands inside the rounding margin of a beam end
+  const nearA = text({ r: -66.65, t: 100, peak: 'B' }, 'comb');
+  assert.ok(nearA.includes('= 0.00 m') && !/off the beam/.test(nearA), nearA);
+  const nearC = text({ r: -44.45, t: 100, peak: 'B' }, 'comb');
+  assert.ok(nearC.includes('= 4.00 m') && !/off the beam/.test(nearC), nearC);
+});

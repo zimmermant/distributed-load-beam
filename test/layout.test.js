@@ -201,3 +201,23 @@ test('the column text lines clear the highest possible arrow: COLS.textY[2] + 6 
   assert.ok(COLS.textY[2] + 6 <= COLS.beamY - COLS.band);
   assert.ok(COLS.fs * 600 <= COLS.band + EPS);
 });
+
+test('loadShapes: every arrow follows the sign of w at its own position, not of r or t alone', () => {
+  const s = { r: 100, t: -200, peak: 'B' };           // w runs +100 at A to -100 at B
+  const L = loadShapes(s);
+  assert.ok(L.arrows.length >= 4);
+  const downs = L.arrows.filter(a => a.yHead === TOP.beamY);
+  const ups = L.arrows.filter(a => a.yHead === TOP.beamY + BEAM_H);
+  assert.equal(downs.length + ups.length, L.arrows.length);
+  assert.ok(downs.length > 0 && ups.length > 0, 'both directions appear');
+  for (const a of L.arrows) {
+    const w = loadAt(s, (a.x - topX(0)) / TOP.px);
+    assert.equal(a.yHead, w > 0 ? TOP.beamY : TOP.beamY + BEAM_H);
+    if (w > 0) assert.ok(a.yTail < a.yHead); else assert.ok(a.yTail > a.yHead);
+  }
+});
+
+test('forceArrow: a missing location, null or undefined, draws nothing', () => {
+  assert.equal(forceArrow(1, 100, undefined), null);
+  assert.equal(forceArrow(1, 100, null), null);
+});

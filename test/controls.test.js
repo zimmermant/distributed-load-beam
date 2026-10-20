@@ -165,3 +165,54 @@ test('peak buttons: click sets the state; aria-pressed and sel follow it', () =>
   parts.peakB.fire('click');
   assert.equal(state.getState().peak, 'B');
 });
+
+test('controlsView reports the peak it was given, not a fixed one', () => {
+  for (const peak of ['A', 'B']) assert.equal(controlsView({ r: 0, t: 0, peak }).peak, peak);
+});
+
+test('the zero flags follow their own slider only', () => {
+  const v = controlsView({ r: 0, t: 0, peak: 'A' });
+  assert.deepEqual([v.rZero, v.tZero], [true, true]);
+  const w = controlsView({ r: -100, t: 100, peak: 'A' });
+  assert.deepEqual([w.rZero, w.tZero], [false, false]);
+});
+
+test('each slider drives its own load, and each peak button its own peak', () => {
+  const { parts, state, input } = rig();
+  input(parts.rSlider, -50);
+  assert.deepEqual(state.getState(), { r: -50, t: 100, peak: 'B' });
+  input(parts.tSlider, 25);
+  assert.deepEqual(state.getState(), { r: -50, t: 25, peak: 'B' });
+  parts.peakA.fire('click');
+  assert.equal(state.getState().peak, 'A');
+  parts.peakB.fire('click');
+  assert.equal(state.getState().peak, 'B');
+});
+
+test('a nudge from 0 through the t slider jumps past the zero zone in both directions', () => {
+  const { root, parts, state, input } = rig();
+  state.setT(0);
+  root.fire('keydown', { key: 'ArrowRight' });
+  input(parts.tSlider, 5);
+  assert.equal(state.getState().t, 15);
+  state.setT(0);
+  root.fire('keydown', { key: 'ArrowLeft' });
+  input(parts.tSlider, -5);
+  assert.equal(state.getState().t, -15);
+  state.setR(0);
+  root.fire('keydown', { key: 'ArrowLeft' });
+  input(parts.rSlider, -5);
+  assert.equal(state.getState().r, -15);
+});
+
+test('a render shows the tzero label for t and not for r, with the peak buttons in step', () => {
+  const { parts, state, controls } = rig();
+  state.setT(0);
+  controls.render(state.getState());
+  assert.equal(parts.tZero.classes.has('on'), true);
+  assert.equal(parts.rZero.classes.has('on'), false);
+  state.set({ peak: 'A' });
+  controls.render(state.getState());
+  assert.equal(parts.peakB.classes.has('sel'), false);
+  assert.equal(parts.peakB.attrs['aria-pressed'], 'false');
+});

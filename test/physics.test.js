@@ -113,3 +113,10 @@ test('nextW: a pointer drag inside the zone lands on 0; a keyboard nudge from 0 
   assert.equal(nextW(0, 100, true), 100);
   assert.ok(Object.is(nextW(0, -0, true), 0));
 });
+
+test('nextW: a non-finite raw value never jumps, even from the keyboard', () => {
+  assert.equal(nextW(0, NaN, true), 0);
+  assert.equal(nextW(0, Infinity, true), 0);
+  assert.equal(nextW(0, -Infinity, true), 0);
+  assert.equal(nextW(0, NaN, false), 0);
+});
