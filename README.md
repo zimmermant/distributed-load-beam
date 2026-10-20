@@ -142,5 +142,5 @@ A pass means every phase is clean: `install` finds the figure at least 600 px wi
 - **Fixed force scale.** Arrow length is `fs × |F|`, with no per-state rescaling.
 - **Class contracts the browser harness relies on.** Every graphic drawn by `scene.js` carries class `g` (the wall and its hatching also `wall`; the A, B, C circles also `pc`); every text carries class `t` (letters inside the circles: `tin`); every SVG text is at least 16 units. Remove a class and the harness stops seeing that element.
 - **Tests that scan HTML strip the tags first** (the markup carries `style` attributes with hyphens before digits), then look for `-0`, `NaN`, `Infinity` and a hyphen-minus before a digit.
-- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (309 rows; every row caught; all 153 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
+- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (313 rows; every row caught; all 156 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
 - **Link text never becomes markup.** The calculation is built only from numbers formatted by `fmt` / `fmtFixed` and fixed strings; the "From the link" line is set with `textContent`.
