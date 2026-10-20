@@ -1,5 +1,24 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 3: number formatting and state
+
+### Summary
+Added `src/format.js` (`MINUS`, `fmt`, `forceWords`, `locWords`) and `src/state.js` (`DEFAULTS`, `createState`, `derive`), with `test/format.test.js` and `test/state.test.js`, and set `MODULES` in `build.js` to `['physics.js', 'format.js', 'svg.js', 'state.js', 'app.js']`. Both modules are pure (no DOM). `fmt` is a faithful port of `../torque_i_beam/src/format.js` `fmt` (toFixed, Number, string, U+2212, null/non-finite gives a dash, never `-0`). `forceWords(F)` gives "200 N down", "10 N up", "0 N" (0 decimals when whole, else 2). `locWords(x)` gives "" for null, "at x = 1.11 m from A", and appends "(off the beam)" when x < 0 or x > BEAM_L. `createState()` is a store of only `{r, t, peak}`: `setR/setT` go through `nextW`, `setPeak` accepts only 'A'/'B', `set` applies a snapped batch with one notification, `subscribe` returns an unsubscribe, `reset` returns to `DEFAULTS`. Tests were written first and seen to fail (modules missing), then pass.
+
+### Decisions made
+- `locWords` imports `BEAM_L` from physics.js (controller ruling; the brief's Consumes line omitted it).
+- `forceWords` decides the sign word from the ROUNDED magnitude, so a force that prints as 0 never reads "0 N down".
+- The state store hands out copies (`getState` and subscriber arguments), so a caller cannot mutate stored state behind the notification logic. Subscribers get the new state as their argument.
+- A change is detected by comparing `r`, `t`, `peak` before and after, so snapped no-ops (e.g. `setR(52)` at 50) do not notify. `set` ignores missing or invalid fields rather than throwing.
+- The sweep test uses real `equivalents()` output over every r, t in [-200, 200] step 5 and both peaks (81*81*2*3 force/location pairs).
+
+### Problems encountered
+- None. The test for "setR(5, true) from 0 stores 15" first brings r to 0 with `setR(0)`, since the default r is 100.
+
+### Open questions / next steps
+- Task 4 onward (svg/scene) will use `fmt`, `forceWords`, `locWords`; app.js (Task 7) wires `createState().subscribe` to rendering.
+- Sources: design `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; plan `docs/superpowers/plans/2026-10-20-distributed-load-beam.md`; reference `../torque_i_beam/src/format.js`.
+
 ## 2026-10-20 - Task 2: physics module
 
 ### Summary

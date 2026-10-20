@@ -9,7 +9,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 const SRC = join(root, 'src');
 
 // Dependency order. app.js runs last because it touches the DOM immediately.
-export const MODULES = ['physics.js', 'svg.js', 'app.js'];
+export const MODULES = ['physics.js', 'format.js', 'svg.js', 'state.js', 'app.js'];
 
 // Anchored at column 0 on purpose. Every top-level declaration in src/ starts
 // there, and matching leading whitespace too would flag ordinary function-local

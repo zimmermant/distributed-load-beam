@@ -82,6 +82,37 @@ function equivalents(s) {
   return { rect, tri, comb, couple };
 }
 
+// ===== format.js =====
+
+
+const MINUS = '−';
+
+// The only way a number reaches the screen. Rounds here and nowhere else; a
+// null or non-finite value prints as a dash; and negative zero can never
+// appear, because String(-0) is "0" and Number("-0.00") is -0.
+function fmt(n, dp = 2) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const s = String(Number(n.toFixed(dp)));
+  return s.startsWith('-') ? MINUS + s.slice(1) : s;
+}
+
+// Signed force (+ down) in words: "200 N down", "10 N up", "0 N".
+// Whole numbers print with no decimals, anything else with two.
+function forceWords(F) {
+  const mag = Math.abs(F);
+  const dp = Number.isInteger(mag) ? 0 : 2;
+  const text = fmt(mag, dp);
+  if (text === '0' || text === '—') return `${text} N`;
+  return `${text} N ${F > 0 ? 'down' : 'up'}`;
+}
+
+// Location in words; '' when there is none (x null). Flags a point beyond the beam.
+function locWords(x) {
+  if (x === null || x === undefined) return '';
+  const off = x < 0 || x > BEAM_L ? ' (off the beam)' : '';
+  return `at x = ${fmt(x)} m from A${off}`;
+}
+
 // ===== svg.js =====
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -129,6 +160,47 @@ function text(parent, x, y, str, opts = {}) {
   }, parent);
   node.textContent = str;
   return node;
+}
+
+// ===== state.js =====
+
+
+const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+
+// Everything is derived from {r, t, peak}; nothing else is stored.
+function derive(s) {
+  return equivalents(s);
+}
+
+// Pure store: no DOM. Subscribers are called with a copy of the new state, and
+// only when a stored value actually changed.
+function createState() {
+  let cur = { ...DEFAULTS };
+  const subs = new Set();
+
+  function commit(next) {
+    if (next.r === cur.r && next.t === cur.t && next.peak === cur.peak) return;
+    cur = next;
+    const snapshot = { ...cur };
+    for (const fn of [...subs]) fn(snapshot);
+  }
+
+  const isPeak = (p) => p === 'A' || p === 'B';
+
+  return {
+    getState: () => ({ ...cur }),
+    setR: (raw, viaKeyboard) => commit({ ...cur, r: nextW(cur.r, raw, viaKeyboard) }),
+    setT: (raw, viaKeyboard) => commit({ ...cur, t: nextW(cur.t, raw, viaKeyboard) }),
+    setPeak: (p) => { if (isPeak(p)) commit({ ...cur, peak: p }); },
+    // A batch (presets): each field is snapped, missing/invalid fields are kept, one notification.
+    set: (p = {}) => commit({
+      r: p.r === undefined ? cur.r : nextW(cur.r, p.r, false),
+      t: p.t === undefined ? cur.t : nextW(cur.t, p.t, false),
+      peak: isPeak(p.peak) ? p.peak : cur.peak
+    }),
+    subscribe: (fn) => { subs.add(fn); return () => { subs.delete(fn); }; },
+    reset: () => commit({ ...DEFAULTS })
+  };
 }
 
 // ===== app.js =====
