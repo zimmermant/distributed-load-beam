@@ -67,6 +67,7 @@ export function describePresets(p) {
   if (p.peak !== undefined) set.push(`peak at ${p.peak}`);
   const parts = [];
   if (set.length) parts.push(`From the link: ${set.join(', ')}.`);
+  else if (p.adjusted.length || p.ignored.length) parts.push('From the link: nothing set.');
   if (p.adjusted.length) parts.push(`Adjusted: ${p.adjusted.join('; ')}.`);
   if (p.ignored.length) parts.push(`Ignored: ${p.ignored.join('; ')}.`);
   return parts.join(' ');

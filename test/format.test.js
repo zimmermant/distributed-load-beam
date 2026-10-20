@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MINUS, fmt, forceWords, locWords } from '../src/format.js';
+import { MINUS, fmt, fmtFixed, forceWords, locWords } from '../src/format.js';
 import { equivalents } from '../src/physics.js';
 
 test('MINUS is U+2212', () => {
@@ -19,6 +19,26 @@ test('fmt: negative zero, minus sign, non-finite', () => {
   assert.equal(fmt(200), '200');
 });
 
+test('fmtFixed: always dp decimals, U+2212, never -0.00, non-finite is a dash', () => {
+  assert.equal(fmtFixed(1), '1.00');
+  assert.equal(fmtFixed(4), '4.00');
+  assert.equal(fmtFixed(0), '0.00');
+  assert.equal(fmtFixed(-0), '0.00');
+  assert.equal(fmtFixed(-0.001), '0.00');
+  assert.equal(fmtFixed(-0.004), '0.00');
+  assert.equal(fmtFixed(-5.3333), '−5.33');
+  assert.equal(fmtFixed(-12), '−12.00');
+  assert.equal(fmtFixed(1.005 * 1, 1), '1.0');
+  assert.equal(fmtFixed(4 / 3), '1.33');
+  assert.equal(fmtFixed(2.5, 0), '3');
+  assert.equal(fmtFixed(-0.4, 0), '0');
+  assert.equal(fmtFixed(NaN), '—');
+  assert.equal(fmtFixed(Infinity), '—');
+  assert.equal(fmtFixed(-Infinity), '—');
+  assert.equal(fmtFixed(null), '—');
+  assert.equal(fmtFixed(undefined), '—');
+});
+
 test('forceWords: down, up, zero', () => {
   assert.equal(forceWords(200), '200 N down');
   assert.equal(forceWords(-10), '10 N up');
@@ -30,12 +50,14 @@ test('forceWords: down, up, zero', () => {
 
 test('locWords: null, on the beam, off the beam', () => {
   assert.equal(locWords(null), '');
+  assert.equal(locWords(1), 'at x = 1.00 m from A');
   assert.equal(locWords(1.1111), 'at x = 1.11 m from A');
-  assert.equal(locWords(0), 'at x = 0 m from A');
-  assert.equal(locWords(4), 'at x = 4 m from A');
+  assert.equal(locWords(0), 'at x = 0.00 m from A');
+  assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
+  assert.equal(locWords(4), 'at x = 4.00 m from A');
   assert.ok(locWords(-16 / 3).endsWith('(off the beam)'));
   assert.equal(locWords(-16 / 3), 'at x = −5.33 m from A (off the beam)');
-  assert.equal(locWords(4.5), 'at x = 4.5 m from A (off the beam)');
+  assert.equal(locWords(4.5), 'at x = 4.50 m from A (off the beam)');
 });
 
 test('no forceWords/locWords result contains -0, NaN or Infinity', () => {

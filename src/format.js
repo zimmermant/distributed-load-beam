@@ -11,6 +11,16 @@ export function fmt(n, dp = 2) {
   return s.startsWith('-') ? MINUS + s.slice(1) : s;
 }
 
+// Always exactly dp decimals ("1.00", "4.00"): used for locations along the beam, where the
+// trailing zeros are part of the reading. A tiny negative that rounds to zero prints "0.00"
+// (toFixed keeps the sign: (-0.001).toFixed(2) is "-0.00"). Non-finite or missing prints a dash.
+export function fmtFixed(n, dp = 2) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  let s = n.toFixed(dp);
+  if (/^-0(\.0*)?$/.test(s)) s = s.slice(1);
+  return s.startsWith('-') ? MINUS + s.slice(1) : s;
+}
+
 // Signed force (+ down) in words: "200 N down", "10 N up", "0 N".
 // Whole numbers print with no decimals, anything else with two.
 export function forceWords(F) {
@@ -24,6 +34,8 @@ export function forceWords(F) {
 // Location in words; '' when there is none (x null). Flags a point beyond the beam.
 export function locWords(x) {
   if (x === null || x === undefined) return '';
-  const off = x < 0 || x > BEAM_L ? ' (off the beam)' : '';
-  return `at x = ${fmt(x)} m from A${off}`;
+  // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  const off = shown < 0 || shown > BEAM_L ? ' (off the beam)' : '';
+  return `at x = ${fmtFixed(x)} m from A${off}`;
 }

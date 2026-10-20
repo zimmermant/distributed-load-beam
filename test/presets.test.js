@@ -69,7 +69,14 @@ test('peak=c is ignored; peak=b is accepted as B', () => {
   // the description lists only what was set, then Adjusted, then Ignored
   assert.strictEqual(describePresets(parsePresets('?r=100&t=-190&peak=c')),
     'From the link: r = 100 N/m, t = −190 N/m. Ignored: peak=c (use A or B).');
-  assert.strictEqual(describePresets(parsePresets('?peak=c')), 'Ignored: peak=c (use A or B).');
+  assert.strictEqual(describePresets(parsePresets('?peak=c')), 'From the link: nothing set. Ignored: peak=c (use A or B).');
+  assert.strictEqual(describePresets(parsePresets('?r=abc&t=x')),
+    'From the link: nothing set. Ignored: r=abc (use a number of N/m); t=x (use a number of N/m).');
+  // Adjusted with nothing set cannot come from parsePresets (an adjusted value is a set value), so pin it directly
+  assert.strictEqual(describePresets({ r: undefined, t: undefined, peak: undefined, adjusted: ['r 7 → 0'], ignored: [] }),
+    'From the link: nothing set. Adjusted: r 7 → 0.');
+  assert.strictEqual(describePresets({ r: undefined, t: undefined, peak: undefined, adjusted: ['r 7 → 0'], ignored: ['peak=c (use A or B)'] }),
+    'From the link: nothing set. Adjusted: r 7 → 0. Ignored: peak=c (use A or B).');
   assert.strictEqual(describePresets(parsePresets('?r=7&t=-190&peak=B&q=c&peak=c')),
     'From the link: r = 0 N/m, t = −190 N/m, peak at B. Adjusted: r 7 → 0.');
   assert.strictEqual(describePresets({ r: 100, t: -190, peak: 'B', adjusted: ['r 7 → 0'], ignored: ['peak=c (use A or B)'] }),
@@ -156,4 +163,24 @@ test('a 60,000-digit value followed by x is refused in under 250 ms (catches the
     assert.strictEqual(p[key], undefined);
     assert.ok(ms < 250, `${key} took ${ms.toFixed(0)} ms`);
   }
+});
+
+// Pins the ACCEPTED number forms (the regex is written unambiguously; these forms must stay valid).
+test('accepted number forms: 1.  .5  +5  -.5', () => {
+  assert.strictEqual(parse(['r', '1.']).r, 0, '1. is the number 1, which snaps to 0');
+  assert.deepStrictEqual(parse(['r', '1.']).ignored, []);
+  assert.strictEqual(parse(['r', '.5']).r, 0);
+  assert.deepStrictEqual(parse(['r', '.5']).ignored, []);
+  assert.strictEqual(parse(['r', '+5']).r, 0);
+  assert.deepStrictEqual(parse(['r', '+5']).ignored, []);
+  assert.strictEqual(parse(['t', '-.5']).t, 0);
+  assert.deepStrictEqual(parse(['t', '-.5']).ignored, []);
+  // the same forms at values that survive snapping
+  assert.strictEqual(parse(['r', '100.']).r, 100);
+  assert.strictEqual(parse(['r', '+100']).r, 100);
+  assert.strictEqual(parse(['t', '-100.']).t, -100);
+  assert.strictEqual(parse(['r', '99.99999']).r, 100);
+  assert.strictEqual(parse(['r', '+.5e']).r, undefined, 'a trailing letter is still refused');
+  assert.strictEqual(parse(['r', '.']).r, undefined, 'a bare dot is not a number');
+  assert.strictEqual(parse(['r', '+']).r, undefined, 'a bare sign is not a number');
 });
