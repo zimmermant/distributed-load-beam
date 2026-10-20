@@ -1,5 +1,26 @@
 # Lab Notebook
 
+## 2026-10-20 - Task 7: panel, controls, page, wiring
+
+### Summary
+Added `src/panel.js` (`calcLines(s)` pure, `createPanel(el)`), `src/controls.js` (`controlsView(s)` pure, `createControls(root, state, parts)`), the real page in `src/index.template.html` and `src/styles.css`, and the full `src/app.js` (state, presets applied once, `#from-link`, one `sync()` subscriber rendering scene, panel and controls). `build.js` MODULES now ends `scene, panel, controls, app`. Two commits: (1) amendments to `format.js`/`presets.js`, (2) this task. Suite 87/87; `dist/` rebuilt (36 KB). Not opened in a browser (the controller does that); a throwaway stub-DOM script (scratchpad, not committed) ran the built bundle: defaults, slider snap to 0, keyboard jump 0 -> 15, peak toggle, `?r=100&t=-190&peak=B`, `?r=7&t=abc&peak=c`, and a markup-looking query string (shown as text, nothing injected).
+
+### Decisions made
+- `fmtFixed(n, dp = 2)` added to `format.js` (always dp decimals, U+2212, `-0.00` impossible, non-finite -> a dash). `locWords` and the calculation print locations with it (`at x = 1.00 m from A`); forces keep `fmt`/`forceWords`. `locWords` judges "(off the beam)" on the PRINTED value so `0.00 m (off the beam)` cannot occur. Scene text needed no change; the longest combined location string is `at x = −12.00 m from A (off the beam)` (37 chars, 3 longer than before the amendment) in the last column that starts at x = 640 of 960: check it for clipping in the browser.
+- `describePresets`: `From the link: nothing set.` prefix when only Adjusted/Ignored notes exist; new test pins the accepted number forms `1.`, `.5`, `+5`, `-.5`.
+- Calculation lines: negative numbers in parentheses in sums and products (`½ × (−190) × 2`, `200 + (−190)`, `/ (−10)`); second term of the force sum is always parenthesised (as the brief's `200 + (100)`). Zero rect/tri: that line says there is no rectangular/triangular load; combined with one part zero says only that part acts; both zero says no load; combined zero (couple) says the parts cancel, no single force, plus a `note` line about the couple. When the sum worked from the PRINTED (rounded) locations would not give the printed answer (e.g. r=100, t=-190 gives -5.27 vs the true -5.33) the line adds `(worked from the unrounded locations)`. Off-beam x̄ is flagged (`left of the wall` / `beyond C`).
+- `createControls(root, state, parts)`: `parts` = the six elements found by id in app.js (so app.js has 10 distinct `getElementById` lookups and the template test can be non-vacuous). Keyboard flag: set by a keydown for Arrow/Page/Home/End on `root`, cleared by the next `input`, and also by `keyup` and `pointerdown` (a key at the end of the slider fires no input and would otherwise mislabel the next drag). After each input and each state change `render` sets `slider.value` when it differs from the state (snap, keyboard jump). `aria-valuetext` carries the true-minus text.
+- Layout CSS: figure max-width 760; controls and calculation side by side from 700 px; two-column page (figure left, 340 px right column) from 1100 px. Hover, active, `:focus-visible` and selected states for sliders (track, thumb) and peak buttons; the zero label becomes a green pill when the value is 0.
+- Page template ids: `fig controls calc from-link r-slider t-slider peak-a peak-b r-readout t-readout`; `#calc` is the aria-live region (heading outside it so it is not re-announced); `#from-link` set with `textContent` only and hidden when empty.
+
+### Problems encountered
+- The first draft of the locWords amendment made `-0.001` read `0.00 m ... (off the beam)`; fixed as above (test added).
+- Slider thumbs: pseudo-elements ignore the page's `box-sizing`, so `box-sizing: border-box` is set on both thumbs to keep the thumb centred on the 0 tick.
+
+### Open questions / next steps
+- Controller, in the browser: figure + controls visible without scrolling at 800x750 and 1280x720 (the controls panel height is an estimate, not measured); no clipping of the longest combined location text; thumb sits under the zero tick at 0; hover/active/focus states look right; no console errors for `?r=100&t=-190&peak=B` and `?r=7&t=abc&peak=c`.
+- Sources: design `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md` (sections "Sliders", "The calculation"); mockup `docs/superpowers/specs/2026-10-20-distributed-load-mockup.html` (`.zs`, `.zt`, `.zl`, `.dir`, calc text); plan `docs/superpowers/plans/2026-10-20-distributed-load-beam.md` (Task 7).
+
 ## 2026-10-20 - Task 6: figure renderer
 
 ### Summary

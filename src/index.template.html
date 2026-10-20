@@ -7,11 +7,44 @@
 <!--INLINE_CSS-->
 </head>
 <body>
+<main class="page">
 <h1>Distributed load on a beam</h1>
 <p id="from-link" hidden></p>
-<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4 metre beam fixed to a wall at A, with a distributed load on the half AB"></svg>
-<section id="controls"></section>
-<section id="calc" aria-live="polite"></section>
+<div class="fig-col">
+<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4 metre beam fixed to a wall at A, with a distributed load on the half AB, and below it the equivalent force of each part and of the two combined"></svg>
+</div>
+<div class="side">
+<section id="controls" class="panel" aria-label="Load controls">
+  <div class="ctl">
+    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b> N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200 (up)</span><span class="zero-label">0</span><span>+200 (down)</span></div>
+    </div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b> N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200 (up)</span><span class="zero-label">0</span><span>+200 (down)</span></div>
+    </div>
+  </div>
+  <div class="peak">
+    <div id="peak-label" class="peak-q">Which end comes to a point (w = 0)?</div>
+    <div class="peak-row" role="group" aria-labelledby="peak-label">
+      <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A (wall), peak at B</span></button>
+      <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A (wall)</span></button>
+    </div>
+  </div>
+</section>
+<section class="panel calc-panel">
+  <h2>How each force is calculated (L = 2 m)</h2>
+  <div id="calc" aria-live="polite"></div>
+</section>
+</div>
+</main>
 <!--INLINE_JS-->
 </body>
 </html>

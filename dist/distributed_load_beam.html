@@ -8,23 +8,143 @@
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  padding: 12px 16px;
+  padding: 8px 16px 12px;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 16px;
   line-height: 1.4;
   color: #111827;
   background: #ffffff;
 }
-h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
+h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+
+/* ---- page layout -------------------------------------------------------
+   below 700 px: everything stacked
+   700 px and up: the figure, then controls and calculation side by side
+   1100 px and up: figure on the left, controls over calculation on the right */
+.page { max-width: 1160px; margin: 0 auto; }
+.fig-col { max-width: 760px; margin: 0 auto; }
+#fig { display: block; width: 100%; height: auto; }
+.side { max-width: 760px; margin: 8px auto 0; display: grid; grid-template-columns: 1fr; gap: 10px; }
+.panel { border: 1px solid #d5dbe3; border-radius: 8px; padding: 8px 12px; background: #f9fafb; }
+@media (min-width: 700px) {
+  .side { grid-template-columns: 1fr 1fr; align-items: start; }
+}
+@media (min-width: 1100px) {
+  .page { display: grid; grid-template-columns: minmax(0, 760px) 340px; column-gap: 20px; align-items: start; justify-content: center; }
+  .page > h1, .page > #from-link { grid-column: 1 / -1; }
+  .fig-col { grid-column: 1; margin: 0; }
+  .side { grid-column: 2; grid-template-columns: 1fr; margin: 0; max-width: none; }
+}
+
+/* ---- the "From the link" note --------------------------------------- */
+#from-link { margin: 0 0 6px; padding: 4px 10px; font-size: 14px; background: #fffbea; border: 1px solid #ecc94b; border-radius: 6px; }
+#from-link[hidden] { display: none; }
+
+/* ---- colours shared by labels and the calculation ------------------- */
+.c-rect { color: #2b6cb0; }
+.c-tri { color: #c05621; }
+.c-comb { color: #2f855a; }
+
+/* ---- sliders ----------------------------------------------------------- */
+.ctl { margin-bottom: 8px; }
+.ctl-head { margin-bottom: 2px; font-size: 15px; }
+.ctl-head label { cursor: pointer; }
+.readout { font-variant-numeric: tabular-nums; display: inline-block; min-width: 2.6em; text-align: right; }
+.zs { position: relative; padding-top: 4px; }
+.zt { position: absolute; left: 50%; top: 4px; width: 2px; height: 28px; margin-left: -1px; background: #2f855a; border-radius: 1px; pointer-events: none; }
+.zs input[type=range] {
+  position: relative; z-index: 1; display: block; width: 100%; height: 28px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+.zs input[type=range]:focus { outline: none; }
+.zs input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #a0aec0; }
+.zs input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: #a0aec0; }
+.zs input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; box-sizing: border-box; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: #ffffff; border: 3px solid #2d3748; box-shadow: 0 1px 3px #0004; transition: transform .08s, background .08s, border-color .08s;
+}
+.zs input[type=range]::-moz-range-thumb {
+  box-sizing: border-box; width: 22px; height: 22px; border-radius: 50%; background: #ffffff; border: 3px solid #2d3748; box-shadow: 0 1px 3px #0004;
+  transition: transform .08s, background .08s, border-color .08s;
+}
+.zs input[type=range]:hover::-webkit-slider-runnable-track { background: #718096; }
+.zs input[type=range]:hover::-moz-range-track { background: #718096; }
+.zs input[type=range]:hover::-webkit-slider-thumb { background: #ebf8ff; border-color: #2b6cb0; transform: scale(1.12); }
+.zs input[type=range]:hover::-moz-range-thumb { background: #ebf8ff; border-color: #2b6cb0; transform: scale(1.12); }
+.zs input[type=range]:active::-webkit-slider-thumb { background: #2b6cb0; border-color: #2c5282; transform: scale(1.2); }
+.zs input[type=range]:active::-moz-range-thumb { background: #2b6cb0; border-color: #2c5282; transform: scale(1.2); }
+.zs input[type=range]:focus-visible::-webkit-slider-thumb { border-color: #2b6cb0; box-shadow: 0 0 0 4px #2b6cb066; }
+.zs input[type=range]:focus-visible::-moz-range-thumb { border-color: #2b6cb0; box-shadow: 0 0 0 4px #2b6cb066; }
+.zl { position: relative; display: flex; justify-content: space-between; margin-top: 2px; font-size: 13px; opacity: .9; }
+.zl .zero-label {
+  position: absolute; left: 50%; transform: translateX(-50%); padding: 0 8px; font-weight: 700; color: #2f855a;
+  border-radius: 10px; transition: background .1s, color .1s;
+}
+.zl .zero-label.on { background: #2f855a; color: #ffffff; }
+
+/* ---- the peak buttons ----------------------------------------------- */
+.peak-q { margin-top: 4px; font-size: 14px; }
+.peak-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.peak-btn {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px; font: inherit; font-size: 14px; color: #111827;
+  background: #edf2f7; border: 2px solid #a0aec0; border-radius: 6px; cursor: pointer;
+}
+.peak-btn:hover { background: #e2e8f0; border-color: #4a5568; }
+.peak-btn:active { background: #cbd5e0; transform: translateY(1px); }
+.peak-btn:focus-visible { outline: 3px solid #2b6cb0; outline-offset: 2px; }
+.peak-btn.sel { background: #f0fff4; border-color: #2f855a; box-shadow: 0 0 0 2px #2f855a33; font-weight: 600; }
+.peak-btn.sel:hover { background: #e6fffa; }
+.peak-btn.sel:active { background: #c6f6d5; }
+
+/* ---- the calculation ------------------------------------------------ */
+#calc { font-size: 14px; line-height: 1.5; }
+#calc .cl { margin-bottom: 6px; }
+#calc .cl:last-child { margin-bottom: 0; }
+#calc .note { font-style: italic; color: #4a5568; }
+#calc .rnd { color: #4a5568; font-size: 13px; }
 
 </style>
 </head>
 <body>
+<main class="page">
 <h1>Distributed load on a beam</h1>
 <p id="from-link" hidden></p>
-<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4 metre beam fixed to a wall at A, with a distributed load on the half AB"></svg>
-<section id="controls"></section>
-<section id="calc" aria-live="polite"></section>
+<div class="fig-col">
+<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4 metre beam fixed to a wall at A, with a distributed load on the half AB, and below it the equivalent force of each part and of the two combined"></svg>
+</div>
+<div class="side">
+<section id="controls" class="panel" aria-label="Load controls">
+  <div class="ctl">
+    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b> N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200 (up)</span><span class="zero-label">0</span><span>+200 (down)</span></div>
+    </div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b> N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200 (up)</span><span class="zero-label">0</span><span>+200 (down)</span></div>
+    </div>
+  </div>
+  <div class="peak">
+    <div id="peak-label" class="peak-q">Which end comes to a point (w = 0)?</div>
+    <div class="peak-row" role="group" aria-labelledby="peak-label">
+      <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A (wall), peak at B</span></button>
+      <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="34" height="18" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A (wall)</span></button>
+    </div>
+  </div>
+</section>
+<section class="panel calc-panel">
+  <h2>How each force is calculated (L = 2 m)</h2>
+  <div id="calc" aria-live="polite"></div>
+</section>
+</div>
+</main>
 <script>
 (function () {
 "use strict";
@@ -527,13 +647,206 @@ function createScene(svg) {
   };
 }
 
+// ===== panel.js =====
+
+
+
+
+// The calculation, written out with the numbers substituted. Every number comes from
+// fmt (forces, whole) or fmtFixed (locations, two decimals); everything else is a fixed
+// string, so no URL text can reach this HTML.
+const PANEL_XBAR = 'x̄';
+
+// A negative number inside a sum or product is written in parentheses.
+function panelPar(n) {
+  const text = fmt(n);
+  return text.startsWith(MINUS) ? `(${text})` : text;
+}
+
+function panelRect(d, s) {
+  const name = '<span class="c-rect"><b>Rectangle</b></span>';
+  if (d.rect.F === 0) return `${name}: w = 0, so there is no rectangular load and no force from it.`;
+  return `${name} (constant w): F = w × L = ${panelPar(s.r)} × ${fmt(LOADED_L)} = <b>${fmt(d.rect.F)} N</b>, ` +
+    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)} m`;
+}
+
+function panelTri(d, s) {
+  const name = '<span class="c-tri"><b>Triangle</b></span>';
+  if (d.tri.F === 0) return `${name}: peak = 0, so there is no triangular load and no force from it.`;
+  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t)} × ${fmt(LOADED_L)} = <b>${fmt(d.tri.F)} N</b>, ` +
+    `acting one third of the way in from the larger end (the peak is at ${s.peak}): x = ${fmtFixed(d.tri.x)} m`;
+}
+
+// A word when the combined force acts off the beam (judged on the printed value).
+function panelWhere(x) {
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  if (shown < 0) return ' (off the beam, left of the wall)';
+  if (shown > BEAM_L) return ' (off the beam, beyond C)';
+  return '';
+}
+
+// True when working the sum from the PRINTED (rounded) locations would not print the printed answer.
+function panelNeedsExact(d) {
+  const shown = (v) => Number(fmtFixed(v));
+  const again = (d.rect.F * shown(d.rect.x) + d.tri.F * shown(d.tri.x)) / d.comb.F;
+  return fmtFixed(again) !== fmtFixed(d.comb.x);
+}
+
+function panelComb(d) {
+  const name = '<span class="c-comb"><b>Combined</b></span>';
+  const sum = `F = ${fmt(d.rect.F)} + (${fmt(d.tri.F)}) = <b>${fmt(d.comb.F)} N</b>`;
+  if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so there is no combined force.`;
+  if (d.comb.F === 0) return `${name}: ${sum}: the two parts cancel, so no single force replaces them.`;
+  if (d.rect.F === 0 || d.tri.F === 0) {
+    const only = d.rect.F === 0 ? 'triangle' : 'rectangle';
+    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)} m</b> ` +
+      `(only the ${only} acts, so its location is the combined one)${panelWhere(d.comb.x)}`;
+  }
+  const num = `${panelPar(d.rect.F)} × ${fmtFixed(d.rect.x)} + ${panelPar(d.tri.F)} × ${fmtFixed(d.tri.x)}`;
+  const exact = panelNeedsExact(d) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F)} = <b>${fmtFixed(d.comb.x)} m</b>` +
+    `${panelWhere(d.comb.x)}${exact}`;
+}
+
+// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'note', html }]. Pure.
+function calcLines(s) {
+  const d = derive(s);
+  const lines = [
+    { key: 'rect', html: panelRect(d, s) },
+    { key: 'tri', html: panelTri(d, s) },
+    { key: 'comb', html: panelComb(d) }
+  ];
+  if (d.couple) {
+    lines.push({
+      key: 'note',
+      html: 'Equal and opposite forces that act at different places do not cancel their turning effect: ' +
+        'together they leave a couple, which no single force can replace.'
+    });
+  }
+  return lines;
+}
+
+// Writes the lines into el, and only when the text changed (a screen reader hears no repeat).
+function createPanel(el) {
+  let last = null;
+  return {
+    render(s) {
+      const html = calcLines(s).map(l => `<div class="cl ${l.key}">${l.html}</div>`).join('');
+      if (html === last) return;
+      last = html;
+      el.innerHTML = html;
+    }
+  };
+}
+
+// ===== controls.js =====
+
+
+// Pure: what the controls show for state s.
+function controlsView(s) {
+  return { rText: fmt(s.r), tText: fmt(s.t), rZero: s.r === 0, tZero: s.t === 0, peak: s.peak };
+}
+
+// Keys that move a range input; a pointer drag is everything else.
+const CONTROLS_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
+
+function controlsSetText(node, str) {
+  if (node.textContent !== str) node.textContent = str;
+}
+
+// root: the controls container (holds the two zero labels, class zero-label, r then t).
+// parts: { rSlider, tSlider, peakA, peakB, rReadout, tReadout } -- the page's elements.
+// Binds the sliders and the peak buttons to state; render(s) shows state s in them.
+function createControls(root, state, parts) {
+  const { rSlider, tSlider, peakA, peakB, rReadout, tReadout } = parts;
+  const zeroLabels = root.getElementsByClassName('zero-label');
+  let viaKeyboard = false;
+
+  function showSlider(slider, readout, zeroLabel, text, value, zero) {
+    // Move the thumb when the state's value differs from it: a snap, or the keyboard's jump past the zero zone.
+    if (Number(slider.value) !== value) slider.value = String(value);
+    slider.setAttribute('aria-valuetext', `${text} N/m`);
+    controlsSetText(readout, text);
+    if (zeroLabel) zeroLabel.classList.toggle('on', zero);
+  }
+
+  function showPeak(button, on) {
+    button.classList.toggle('sel', on);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function render(s) {
+    const v = controlsView(s);
+    showSlider(rSlider, rReadout, zeroLabels[0], v.rText, s.r, v.rZero);
+    showSlider(tSlider, tReadout, zeroLabels[1], v.tText, s.t, v.tZero);
+    showPeak(peakA, v.peak === 'A');
+    showPeak(peakB, v.peak === 'B');
+  }
+
+  // A key marks the NEXT input event as a keyboard one; that event clears the mark. A key that
+  // changes nothing (a slider already at its end) fires no input, so a key release and a
+  // pointer press clear it too, or the next drag would be taken for a key press.
+  root.addEventListener('keydown', (e) => { if (CONTROLS_KEYS.includes(e.key)) viaKeyboard = true; });
+  root.addEventListener('keyup', () => { viaKeyboard = false; });
+  root.addEventListener('pointerdown', () => { viaKeyboard = false; });
+
+  function onInput(set) {
+    const kb = viaKeyboard;
+    viaKeyboard = false;
+    set(kb);
+    render(state.getState());   // the state may not have changed (a snap back to 0): still put the thumb right
+  }
+  rSlider.addEventListener('input', () => onInput((kb) => state.setR(Number(rSlider.value), kb)));
+  tSlider.addEventListener('input', () => onInput((kb) => state.setT(Number(tSlider.value), kb)));
+  peakA.addEventListener('click', () => state.setPeak('A'));
+  peakB.addEventListener('click', () => state.setPeak('B'));
+
+  return { render };
+}
+
 // ===== app.js =====
 
 
 
-document.title = 'Distributed load on a beam';
-// Temporary: Task 7 replaces this with the full app (controls, calculation, presets).
-createScene(document.getElementById('fig')).render(createState().getState());
+
+
+
+// Everything is looked up by id here, once; the modules get the elements, never the document.
+function appStart() {
+  document.title = 'Distributed load on a beam';
+  const state = createState();
+  const scene = createScene(document.getElementById('fig'));
+  const panel = createPanel(document.getElementById('calc'));
+  const controls = createControls(document.getElementById('controls'), state, {
+    rSlider: document.getElementById('r-slider'),
+    tSlider: document.getElementById('t-slider'),
+    peakA: document.getElementById('peak-a'),
+    peakB: document.getElementById('peak-b'),
+    rReadout: document.getElementById('r-readout'),
+    tReadout: document.getElementById('t-readout')
+  });
+
+  // Presets from the link apply once, before the first render. Only the fields the link set.
+  const presets = parsePresets(location.search);
+  const fields = {};
+  for (const k of ['r', 't', 'peak']) if (presets[k] !== undefined) fields[k] = presets[k];
+  state.set(fields);
+  const note = describePresets(presets);
+  const link = document.getElementById('from-link');
+  link.textContent = note;            // text only: the link's own text can never become markup
+  link.hidden = note === '';
+
+  function sync() {
+    const s = state.getState();
+    scene.render(s);
+    panel.render(s);
+    controls.render(s);
+  }
+  state.subscribe(sync);
+  sync();
+}
+
+appStart();
 
 })();
 </script>
