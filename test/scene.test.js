@@ -4,7 +4,7 @@ import { stubElement, installSvgDocument } from './stub-dom.js';
 import { createScene } from '../src/scene.js';
 import { COLORS } from '../src/svg.js';
 import { BEAM_L, LOADED_L } from '../src/physics.js';
-import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow } from '../src/layout.js';
+import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline } from '../src/layout.js';
 import { derive } from '../src/state.js';
 
 installSvgDocument();
@@ -301,4 +301,84 @@ test('a combined force just off the wall (x = 0.10 m) gets no arrow and its text
   assert.ok(arrows.every(a => a.color !== COLORS.comb));
   const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2]);
   assert.equal(third[0].textContent, 'at x = 0.10 m from A (near the wall)');
+});
+
+// ---- dotted outlines of the load in the three columns ----------------------------------------
+const outlines = (svg) => svg.children.filter(n => classes(n).includes('outline'));
+const COLUMN_COLORS = [COLORS.rect, COLORS.tri, COLORS.comb];
+
+test('outlines: dotted, unfilled, round-capped, in the column colour, class "g outline", a closed path', () => {
+  const svg = draw(STATES[0]);
+  const o = outlines(svg);
+  assert.equal(o.length, 3);
+  assert.deepEqual(o.map(n => n.attrs.stroke), COLUMN_COLORS);
+  for (const n of o) {
+    assert.equal(n.tag, 'path');
+    assert.equal(n.attrs.class, 'g outline');
+    assert.equal(n.attrs['stroke-dasharray'], '2 4');
+    assert.equal(n.attrs['stroke-width'], '1.8');
+    assert.equal(n.attrs['stroke-linecap'], 'round');
+    assert.equal(n.attrs.fill, 'none');
+    assert.match(n.attrs.d, /^M\S+ \S+( L\S+ \S+){2,3} Z$/);
+  }
+});
+
+test('outlines: the path points are exactly the layout polygons of that column', () => {
+  for (const s of STATES) {
+    const o = outlines(draw(s));
+    const want = [0, 1, 2].flatMap(k => columnOutline(k, s).map(poly => ({ k, poly })));
+    assert.equal(o.length, want.length, JSON.stringify(s));
+    o.forEach((n, i) => {
+      const got = n.attrs.d.replace(/^M/, '').replace(/ Z$/, '').split(' L').map(p => p.split(' ').map(Number));
+      assert.deepEqual(got, want[i].poly, JSON.stringify(s));
+      assert.equal(n.attrs.stroke, COLUMN_COLORS[want[i].k]);
+    });
+  }
+});
+
+test('outlines: none for a zero load; a lone rectangle or triangle draws its own and the combined one', () => {
+  assert.equal(outlines(draw({ r: 0, t: 0, peak: 'A' })).length, 0);
+  const rectOnly = outlines(draw({ r: 100, t: 0, peak: 'B' }));
+  assert.deepEqual(rectOnly.map(n => n.attrs.stroke), [COLORS.rect, COLORS.comb]);
+  const triOnly = outlines(draw({ r: 0, t: -100, peak: 'A' }));
+  assert.deepEqual(triOnly.map(n => n.attrs.stroke), [COLORS.tri, COLORS.comb]);
+});
+
+test('outlines: the default state draws exactly 3, a sign-changing net load exactly 4 (1 + 1 + 2)', () => {
+  assert.equal(outlines(draw({ r: 100, t: 100, peak: 'B' })).length, 3);
+  const four = outlines(draw({ r: 100, t: -200, peak: 'B' }));
+  assert.equal(four.length, 4);
+  assert.deepEqual(four.map(n => n.attrs.stroke), [COLORS.rect, COLORS.tri, COLORS.comb, COLORS.comb]);
+});
+
+test('outlines: each is drawn after its column beam and before its column arrow (the arrow is on top)', () => {
+  for (const s of [STATES[0], STATES[3], STATES[8]]) {
+    const svg = draw(s);
+    const kids = svg.children;
+    const beams = kids.map((n, i) => [n, i]).filter(([n]) => n.tag === 'rect' && n.attrs.fill === COLORS.beam).map(([, i]) => i);
+    assert.equal(beams.length, 4);
+    let checked = 0;
+    for (let k = 0; k < 3; k++) {
+      const mine = kids.map((n, i) => [n, i]).filter(([n]) => classes(n).includes('outline') && n.attrs.stroke === COLUMN_COLORS[k]).map(([, i]) => i);
+      const arrow = kids.findIndex(n => n.tag === 'g' && n.children[0] && n.children[0].attrs['stroke-width'] === '3.4' && n.children[0].attrs.stroke === COLUMN_COLORS[k]);
+      for (const i of mine) {
+        assert.ok(i > beams[k + 1], `column ${k} outline after its beam`);
+        if (arrow >= 0) assert.ok(i < arrow, `column ${k} outline before its arrow`);
+        checked++;
+      }
+    }
+    assert.equal(checked, outlines(svg).length);
+    assert.ok(checked >= 3);
+  }
+});
+
+test('outlines: the default state has an arrow inside each outline (by design) and each column has one arrow after its outline', () => {
+  const svg = draw(STATES[0]);
+  const arrows = arrowGroups(svg).map(arrowOf).filter(a => a.width === 3.4);
+  assert.equal(arrows.length, 3);
+  for (const k of [0, 1, 2]) {
+    const poly = columnOutline(k, STATES[0])[0];
+    const xs = poly.map(p => p[0]);
+    assert.ok(arrows[k].x > Math.min(...xs) && arrows[k].x < Math.max(...xs), `arrow ${k} lies between the outline's ends`);
+  }
 });

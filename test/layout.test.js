@@ -1,6 +1,7 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { VB, BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow } from '../src/layout.js';
+import { VB, BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline } from '../src/layout.js';
 import { BEAM_L, LOADED_L, WALL_CLEAR_M, loadAt, equivalents } from '../src/physics.js';
 
 const EPS = 1e-9;
@@ -220,4 +221,122 @@ test('loadShapes: every arrow follows the sign of w at its own position, not of 
 test('forceArrow: a missing location, null or undefined, draws nothing', () => {
   assert.equal(forceArrow(1, 100, undefined), null);
   assert.equal(forceArrow(1, 100, null), null);
+});
+
+// ---- columnOutline: the dotted outline of the load in each equivalent-force column ---------------
+const TOPF = COLS.beamY;                 // the beam's top face in the columns
+const BOTF = COLS.beamY + BEAM_H;        // its bottom face
+const pts = (polys) => polys.map(poly => poly.map(p => p.map(v => Math.round(v * 1e6) / 1e6)));
+const U = TOP.unit;
+
+test('columnOutline rectangle (column 0): r=100 sits above the beam, r=-100 hangs below, r=0 is empty', () => {
+  const x0 = colX(0, 0), x2 = colX(0, LOADED_L);
+  assert.deepEqual(pts(columnOutline(0, { r: 100, t: 0, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 100 * U], [x2, TOPF - 100 * U], [x2, TOPF]]]);
+  assert.deepEqual(pts(columnOutline(0, { r: -100, t: 0, peak: 'B' })), [[[x0, BOTF], [x0, BOTF + 100 * U], [x2, BOTF + 100 * U], [x2, BOTF]]]);
+  assert.equal(TOPF - 100 * U, TOPF - 20);          // the brief's height of 20 units for 100 N/m
+  assert.deepEqual(columnOutline(0, { r: 0, t: 150, peak: 'A' }), []);
+  // the triangle never leaks into the rectangle's column
+  assert.deepEqual(columnOutline(0, { r: 100, t: 150, peak: 'A' }), columnOutline(0, { r: 100, t: -50, peak: 'B' }));
+});
+
+test('columnOutline triangle (column 1): base on the face, apex at the peak end, t<0 hangs below, t=0 is empty', () => {
+  const x0 = colX(1, 0), x2 = colX(1, LOADED_L);
+  assert.deepEqual(pts(columnOutline(1, { r: 100, t: 100, peak: 'B' })), [[[x0, TOPF], [x2, TOPF - 20], [x2, TOPF]]]);
+  assert.deepEqual(pts(columnOutline(1, { r: 100, t: 100, peak: 'A' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF]]]);
+  assert.deepEqual(pts(columnOutline(1, { r: 0, t: -100, peak: 'B' })), [[[x0, BOTF], [x2, BOTF + 20], [x2, BOTF]]]);
+  assert.deepEqual(pts(columnOutline(1, { r: 0, t: -100, peak: 'A' })), [[[x0, BOTF], [x0, BOTF + 20], [x2, BOTF]]]);
+  assert.deepEqual(columnOutline(1, { r: 100, t: 0, peak: 'B' }), []);
+  assert.deepEqual(columnOutline(1, { r: -100, t: 0, peak: 'A' }), []);
+  // the rectangle never leaks into the triangle's column
+  assert.deepEqual(columnOutline(1, { r: 100, t: 100, peak: 'B' }), columnOutline(1, { r: -200, t: 100, peak: 'B' }));
+});
+
+test('columnOutline combined (column 2): trapezoid for the net load, two triangles at a sign change, one triangle when an end is 0', () => {
+  const x0 = colX(2, 0), x2 = colX(2, LOADED_L);
+  // r=100, t=100, peak B: w = 100 at A, 200 at B -> heights 20 and 40
+  assert.deepEqual(pts(columnOutline(2, { r: 100, t: 100, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF - 40], [x2, TOPF]]]);
+  // peak A mirrors it
+  assert.deepEqual(pts(columnOutline(2, { r: 100, t: 100, peak: 'A' })), [[[x0, TOPF], [x0, TOPF - 40], [x2, TOPF - 20], [x2, TOPF]]]);
+  // r=100, t=-200, peak B: +100 at A, -100 at B, zero at xc = 1 m
+  const xc = colX(2, 1);
+  const two = columnOutline(2, { r: 100, t: -200, peak: 'B' });
+  assert.equal(two.length, 2);
+  assert.deepEqual(pts(two), [[[x0, TOPF], [x0, TOPF - 20], [xc, TOPF]], [[xc, BOTF], [x2, BOTF + 20], [x2, BOTF]]]);
+  // w(0) = 0: one triangle only (r=0, t=100, peak B), same shape as the column-1 outline of that load
+  const one = columnOutline(2, { r: 0, t: 100, peak: 'B' });
+  assert.equal(one.length, 1);
+  assert.deepEqual(pts(one), [[[x0, TOPF], [x2, TOPF - 20], [x2, TOPF]]]);
+  // w(L) = 0 (r=100, t=-100, peak B): w goes 100 -> 0, one triangle apex at A
+  assert.deepEqual(pts(columnOutline(2, { r: 100, t: -100, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF]]]);
+  // all-negative net: hangs below
+  assert.deepEqual(pts(columnOutline(2, { r: -100, t: -100, peak: 'B' })), [[[x0, BOTF], [x0, BOTF + 20], [x2, BOTF + 40], [x2, BOTF]]]);
+  // nothing: no load, and a net load that is identically zero
+  assert.deepEqual(columnOutline(2, { r: 0, t: 0, peak: 'A' }), []);
+  assert.deepEqual(columnOutline(2, { r: 0, t: 0, peak: 'B' }), []);
+});
+
+test('columnOutline crossing: the zero crossing sits at xc = L*w(0)/(w(0)-w(L)), from the end values (r=100, t=-300 crosses at 2/3 m)', () => {
+  const two = columnOutline(2, { r: 100, t: -300, peak: 'B' });       // w: +100 at A, -200 at B
+  assert.equal(two.length, 2);
+  const xc = colX(2, LOADED_L * 100 / 300);
+  close(two[0][2][0], xc, 'first piece ends at the crossing');
+  close(two[1][0][0], xc, 'second piece starts at the crossing');
+  close(two[0][1][1], TOPF - 100 * U);
+  close(two[1][1][1], BOTF + 200 * U);
+  // peak A: w(0) = r + t = -100 at A, w(L) = r = 100 at B -> crossing at L/2
+  const a = columnOutline(2, { r: 100, t: -200, peak: 'A' });
+  assert.equal(a.length, 2);
+  close(a[0][2][0], colX(2, 1));
+  assert.ok(a[0].every(p => p[1] >= BOTF - 1e-9), 'the negative piece (near A) hangs below');
+  assert.ok(a[1].every(p => p[1] <= TOPF + 1e-9), 'the positive piece (near B) sits above');
+});
+
+test('columnOutline over the slider grid: inside the column band and the AB span, never degenerate, on the right face', () => {
+  const eps = 1e-9, lo = COLS.beamY - COLS.band, hi = COLS.beamY + BEAM_H + COLS.band;
+  let states = 0, polys = 0, expectedPolys = 0;
+  for (const peak of ['A', 'B']) for (let r = -200; r <= 200; r += 5) for (let t = -200; t <= 200; t += 5) {
+    const s = { r, t, peak };
+    const w0 = loadAt(s, 0), wL = loadAt(s, LOADED_L);
+    const want = [r !== 0 ? 1 : 0, t !== 0 ? 1 : 0, w0 * wL < 0 ? 2 : (w0 !== 0 || wL !== 0 ? 1 : 0)];
+    for (let k = 0; k < 3; k++) {
+      const out = columnOutline(k, s);
+      assert.equal(out.length, want[k], `k=${k} ${JSON.stringify(s)}`);
+      expectedPolys += want[k];
+      states++;
+      for (const poly of out) {
+        polys++;
+        assert.ok(poly.length === 3 || poly.length === 4, 'triangle or four-sided');
+        let area = 0;
+        poly.forEach((p, i) => {
+          const q = poly[(i + 1) % poly.length];
+          area += p[0] * q[1] - q[0] * p[1];
+          assert.ok(p[1] >= lo - eps && p[1] <= hi + eps, `y ${p[1]} in band, k=${k} ${JSON.stringify(s)}`);
+          assert.ok(p[0] >= colX(k, 0) - eps && p[0] <= colX(k, LOADED_L) + eps, `x ${p[0]} in AB span, k=${k}`);
+          assert.ok(p[0] !== q[0] || p[1] !== q[1], 'no repeated point');
+        });
+        assert.ok(Math.abs(area) / 2 > 1e-6, `non-zero area, k=${k} ${JSON.stringify(s)}`);
+        const above = poly.every(p => p[1] <= TOPF + eps);
+        const below = poly.every(p => p[1] >= BOTF - eps);
+        assert.ok(above !== below, `entirely above the top face or below the bottom face, k=${k} ${JSON.stringify(s)}`);
+      }
+      if (k === 0 && out.length) assert.equal(out[0].every(p => p[1] <= TOPF + eps), r > 0);
+      if (k === 1 && out.length) assert.equal(out[0].every(p => p[1] <= TOPF + eps), t > 0);
+      if (k === 2 && out.length === 1) assert.equal(out[0].every(p => p[1] <= TOPF + eps), w0 + wL > 0);
+      if (k === 2 && out.length === 2) {
+        assert.equal(out[0].every(p => p[1] <= TOPF + eps), w0 > 0);
+        assert.equal(out[1].every(p => p[1] <= TOPF + eps), wL > 0);
+      }
+    }
+  }
+  assert.equal(states, 2 * 81 * 81 * 3);
+  assert.equal(expectedPolys, polys);
+  assert.ok(polys > 20000, `a non-vacuous count of polygons (${polys})`);
+});
+
+test('the browser harness hard-codes the same column geometry as layout.js (check 9 would drift silently otherwise)', () => {
+  const src = readFileSync(new URL('../tools/browser-harness.js', import.meta.url), 'utf8');
+  const line = src.match(/const COLS_X = (\[[^\]]*\]), COLS_OFFSET = (\d+), COLS_PX = (\d+), COLS_BEAM_Y = (\d+), COLS_BAND = (\d+), BEAM_H = (\d+), LOADED_L = (\d+);/);
+  assert.ok(line, 'the constants line is present');
+  assert.deepEqual(JSON.parse(line[1]), COLS.x);
+  assert.deepEqual(line.slice(2).map(Number), [COLS.offset, COLS.px, COLS.beamY, COLS.band, BEAM_H, LOADED_L]);
 });

@@ -2,13 +2,15 @@ import { BEAM_L, LOADED_L } from './physics.js';
 import { fmt, forceWords, locWords } from './format.js';
 import { el, clear, text, COLORS } from './svg.js';
 import { derive } from './state.js';
-import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow } from './layout.js';
+import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline } from './layout.js';
 
 // Drawing style only: every position and length comes from layout.js.
 const SCENE_TEXT = 16;            // every text is at least this many units (12 px at 800 px wide)
 const SCENE_LINE_MAX = 24;        // characters per line in the top-right text block
 const SCENE_FILL = 0.2;           // fill opacity of the load shapes
 const SCENE_DASH = '5 3';
+const SCENE_OUTLINE_DASH = '2 4';  // the dotted outline of the load in each column
+const SCENE_OUTLINE_W = 1.8;
 const SCENE_WALL_W = 14;
 const SCENE_WALL_OVER = 18;       // the wall rises this far above and below the beam
 const SCENE_HATCHES = 4;
@@ -127,7 +129,16 @@ function sceneTop(svg, s) {
   sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ down, − up)', {}).setAttribute('opacity', 0.7);
 }
 
-function sceneColumns(svg, d) {
+// A dotted, unfilled outline of one layout polygon (its points as given, closed with Z).
+function sceneOutline(parent, poly, color) {
+  const d = `M${poly.map(p => p.join(' ')).join(' L')} Z`;
+  return el('path', {
+    class: 'g outline', d, fill: 'none', stroke: color, 'stroke-width': SCENE_OUTLINE_W,
+    'stroke-dasharray': SCENE_OUTLINE_DASH, 'stroke-linecap': 'round'
+  }, parent);
+}
+
+function sceneColumns(svg, d, s) {
   const parts = [
     ['Rectangular', d.rect, COLORS.rect],
     ['Triangular', d.tri, COLORS.tri],
@@ -135,6 +146,7 @@ function sceneColumns(svg, d) {
   ];
   parts.forEach(([name, part, color], k) => {
     sceneBeam(svg, colX(k, 0), COLS.beamY, COLS.px);
+    for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
     const a = forceArrow(k, part.F, part.x);
     if (a) sceneArrow(svg, a, color, 3.4);
     const lines = sceneColumnLines(name, part, d);
@@ -151,7 +163,7 @@ export function createScene(svg) {
     render(s) {
       clear(svg);
       sceneTop(svg, s);
-      sceneColumns(svg, derive(s));
+      sceneColumns(svg, derive(s), s);
     }
   };
 }
