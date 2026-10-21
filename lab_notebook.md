@@ -1,5 +1,63 @@
 # Lab Notebook
 
+## 2026-10-21 - Merged: framed card per equivalent-force column
+
+### Summary
+`feat/column-cards` was merged into `main` with `--no-ff` (merge commit bb954e8) at Todd's request ("merge and republish"); `main` had not moved since the fork (ff75b79), so the merge was clean. The branch frames each equivalent-force column in a rounded card in its own colour with the label (name, force, location) as the card's heading, so it is obvious at a glance which label goes with which diagram.
+
+### Decisions made
+- Local merge, `--no-ff`; the branch was deleted afterwards.
+- Re-verified on the merged tree: 184 of 184 tests pass; `node build.js` reproduces the committed `dist/distributed_load_beam.html` byte-for-byte (40,839 bytes); tree clean. Before the merge the harness was clean at 800x750, 1280x720 and 1000x700, and the full mutation audit caught all 354 rows with every test covered.
+- Republished with the same method as the previous republish (a new commit on top of the public history; see that entry).
+
+### Problems encountered
+None during the merge.
+
+### Open questions / next steps
+- Not yet tried inside a real Canvas iframe.
+- Sources: `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`, `docs/superpowers/sdd-ledger-distributed-load-beam.md`.
+
+## 2026-10-21 - A tinted card per equivalent-force column, the label as its heading
+
+### Summary
+Todd, after looking at the published page: "Move the labels for Rectangular, Triangular, and Combined to be closer to the depiction of each. It should be obvious at a glance which label goes with which diagram." Each of the three bottom columns is now enclosed in a rounded card in the column colour (`COLORS.rect` / `tri` / `comb`: fill opacity 0.05, frame opacity 0.45, width 1.5, rx 8), and the three text lines (name, force, location) are the card's heading, set in a darker band (fill opacity 0.12, top corners rounded like the card, square at the bottom) across its top. Branch `feat/column-cards` (from `main`). NOT merged, NOT republished. 184 tests (12 new: 6 layout, 6 scene); 354 mutation rows (16 new), all caught, every test covered. Files: `src/layout.js` (`COLS.card`, `COLS.textPad`, `columnCard(k)`), `src/scene.js` (`sceneCard`, text x + pad), `tools/browser-harness.js` (check 9, probe 7), `tools/mutations.mjs`, tests, README, spec, ledger, `dist/`.
+
+### Decisions made
+- **Todd chose option 1 of 3.** The labels already sat directly above the space reserved for the tallest possible arrow or outline; what looked like distance was that reserved space being empty for most loads. The three options offered in chat were (1) a framed, column-tinted card per column with the label as its heading (the recommendation: stable, nothing moves while dragging a slider), (2) labels that follow the top of each drawing and move as the loads change, (3) a smaller reserved space by shrinking the force-arrow scale about 25%. Todd answered "1".
+- **Geometry (all in `COLS.card`, no literal restated elsewhere):** card x = `COLS.x[k]` - 4, width 300, y 240 to 558 (height 318), so the gap between neighbours is 310 - 300 = 10 and the stroke stays inside the 560-unit viewBox (558 + 0.75). The heading band is 74 tall (ends at y 314, above the arrow band that starts at `COLS.beamY - COLS.band` = 316). The three text lines keep their baselines (262, 284, 306) and move right by `COLS.textPad` = 8; the widest text ("at x = -12.00 m from A (off the beam)", 37 characters, about 272 units) then ends at about `COLS.x[k]` + 280, inside the card's right edge at `COLS.x[k]` + 296. Nothing vertical grows, so the viewport budgets are unchanged.
+- **Why there is a gap between the cards:** 10 units, so two neighbouring frames never touch and each card reads as one unit.
+- **Class `card`, not `g`.** The harness's text-versus-graphic checks (overlap of a text with a top-level `.g`) must keep ignoring the cards, otherwise every column text would "overlap" its own card. The card and the band are separate elements (a rect and a path), both class `card`.
+- **Draw order per column:** card, band, beam copy (wall, hatching, circles), outline(s), arrow, texts, so the translucent tint is behind everything.
+- **Harness check 9** (added after the existing checks, no renumbering): the three `rect.card` are where `layout.js` puts them (constants `CARD_DX`, `CARD_W`, `CARD_Y`, `CARD_BOTTOM`, tied to `layout.js` by a drift test), and every `text.t`, `text.tin` and top-level `.g` whose centre is at or below the card tops lies inside the card whose x-range holds its centre (0.5 tolerance); a floor of 40 checked elements keeps it from being vacuous. `sensitivity()` has a seventh fault, PROBE7, a text that starts at x = 300 and so straddles the edge between cards 0 and 1, and requires exactly one `outside its card` report (the planted one). `flagged` now also needs `cardCaught` and `cardOnlyPlanted`.
+- **Mutation rows (16):** layout: card narrower (width 280), top too low (y 300), heading band 120 tall, text pad removed, bottom past the viewBox, card x from column 0; scene: card not drawn, wrong colour in column 2, card drawn after the content, text pad removed, square band corners, class `g` on a card, band as faint as the card, opaque frame, heavy tint (0.5), band as tall as the card. Full run: `docs/superpowers/mutation-coverage-run.txt`.
+
+### Problems encountered
+- Two existing scene tests selected the load shapes by fill colour (`rect` with `COLORS.rect`, `path` with `COLORS.tri`), which now also matches a card and a band; they exclude class `card`. The "every graphic carries class g" test exempts the six card elements by class and a new test pins that exactly three cards and three bands exist and none has class `g`.
+- Two scene tests that read the combined location line by `x === COLS.x[2]` now read `COLS.x[2] + COLS.textPad`.
+- The first RED run needed a stub `columnCard` (an import error is not a useful failure); with it, 15 tests failed on assertions.
+- The harness cannot run here (no browser). I smoke-tested the check 9 and probe 7 logic against a throwaway fake DOM built from `scene.js` output with estimated text widths (clean over a 578-state grid; PROBE7 reported once; `sensitivity().flagged` true). That is a logic check only, not a measurement.
+
+### Open questions / next steps
+- NOT verified by the implementer (no browser): how the cards and bands look (tint strength, frame visibility, rounded top corners of the band), and the real harness at 800x750, 1280x720 and 1000x700 (`H.all()`: expect `violations: []`, `flagged: true`, `budget.ok: true`). The widest text's real width in a browser should be confirmed to stay inside the card (about 272 + 8 units against 296).
+- Merge and republish only on Todd's say-so (method in the 2026-10-21 republish entry below).
+- Sources: Todd's chat request above; `.superpowers/sdd/2026-10-20-distributed-load-beam/cards-brief.md` (local, not committed); spec `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md` ("The equivalent forces"); ledger `docs/superpowers/sdd-ledger-distributed-load-beam.md`.
+
+## 2026-10-21 - Republished to GitHub Pages (update commit on top of the public history)
+
+### Summary
+The merged build (e587e64 here) is live at https://zimmermant.github.io/distributed-load-beam/ as public commit 0ae6e00 ("Update: arrow shown at the wall, controls always below the figure, dotted load outlines"), a normal fast-forward push on top of the existing public history: no history rewrite and no force-push. The live `dist/distributed_load_beam.html` is byte-identical to the local build. On the live page the browser harness is clean at 800x750 and 1280x720 (176 combinations, 0 violations, text 12.3 px, all probes caught, budget ok), the controls sit below the figure, and the wall state draws its arrow.
+
+### Decisions made
+- Method (preferred over a rewrite whenever the public repo already exists): `git clone --no-hardlinks` the public repo into a scratch directory, ASSERT its `rev-parse --show-toplevel` is that directory and not this repo, export this repo's tracked files with `git archive HEAD`, delete `docs/`, scrub local paths from `lab_notebook.md`, `rsync -a --delete --exclude .git` into the clone, check `git status` lists only expected files, run the tests there, scan the diff and tree for local paths and secret-like strings, commit, push. Pre-push checks: 172 of 172 tests pass in the public clone, its build is reproducible and identical to this repo's dist, zero local-path or secret-like hits in the added lines or the tree, no `docs/` or tooling folders public.
+- This notebook entry (written after the push) reaches the public copy with the next update.
+
+### Problems encountered
+None.
+
+### Open questions / next steps
+- Not yet tried inside a real Canvas iframe.
+- A future republish repeats the method above; the build ledger is `docs/superpowers/sdd-ledger-distributed-load-beam.md`.
+
 ## 2026-10-21 - Merged: arrow at the wall, controls below the figure
 
 ### Summary

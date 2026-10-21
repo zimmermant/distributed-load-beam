@@ -424,7 +424,13 @@ const BEAM_H = 24;
 // top figure (the actual load); `band` is the room above and below the beam
 const TOP = { x0: 90, px: 150, beamY: 90, unit: 0.2, band: 80, dimY: 206, dimTextY: 228, textX: 730 };
 // three columns (the equivalent forces); fs is the FIXED force scale, units per newton
-const COLS = { x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306] };
+// `card` is the framed, tinted card around each column: dx from COLS.x[k] to its left edge, w its width, y its top, bottom its
+// lower edge (its stroke must stay inside VB.h), rx the corner radius, headH the height of the heading band that holds the three
+// text lines (it must end above COLS.beamY - COLS.band), stroke the frame width. textPad is the left padding of those lines.
+const COLS = {
+  x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306], textPad: 8,
+  card: { dx: -4, w: 300, y: 240, bottom: 558, rx: 8, headH: 74, stroke: 1.5 }
+};
 
 const LAYOUT_MIN_ARROW = 8;   // net-load arrows shorter than this are not drawn
 const LAYOUT_ARROWS = 8;
@@ -437,6 +443,12 @@ function topX(x) {
 // column k (0 rect, 1 tri, 2 comb), metres from A -> viewBox x
 function colX(k, x) {
   return COLS.x[k] + COLS.offset + x * COLS.px;
+}
+
+// The card of column k (0 rect, 1 tri, 2 comb): { x, y, w, h, rx, headH } in viewBox units.
+function columnCard(k) {
+  const c = COLS.card;
+  return { x: COLS.x[k] + c.dx, y: c.y, w: c.w, h: c.bottom - c.y, rx: c.rx, headH: c.headH };
 }
 
 // One arrow of length len pointing at the beam from the side the sign says.
@@ -546,6 +558,9 @@ const SCENE_WALL_OVER = 18;       // the wall rises this far above and below the
 const SCENE_HATCHES = 4;
 const SCENE_PIN_R = BEAM_H / 2;   // the A, B, C circles exactly fill the beam's height
 const SCENE_HEAD_MAX = 9;         // arrow head length cap
+const SCENE_CARD_FILL = 0.05;     // the column card's tint
+const SCENE_CARD_STROKE = 0.45;   // the column card's frame opacity
+const SCENE_CARD_HEAD = 0.12;     // the heading band's tint
 
 // A text node with its class set (svg.js's text() takes no class option).
 function sceneText(parent, x, y, str, opts, cls = 't') {
@@ -668,6 +683,22 @@ function sceneOutline(parent, poly, color) {
   }, parent);
 }
 
+// The card of column k: a tinted, framed rounded rectangle, then its heading band (the same tint, darker,
+// square at the bottom and rounded like the card at the top). Class `card`, not `g`: the harness's
+// text-versus-graphic checks must ignore them.
+function sceneCard(parent, k, color) {
+  const c = columnCard(k);
+  el('rect', {
+    class: 'card', x: c.x, y: c.y, width: c.w, height: c.h, rx: c.rx, fill: color, 'fill-opacity': SCENE_CARD_FILL,
+    stroke: color, 'stroke-opacity': SCENE_CARD_STROKE, 'stroke-width': COLS.card.stroke
+  }, parent);
+  const r = c.rx, right = c.x + c.w, bottom = c.y + c.headH;
+  el('path', {
+    class: 'card', fill: color, 'fill-opacity': SCENE_CARD_HEAD,
+    d: `M${c.x} ${c.y + r} A${r} ${r} 0 0 1 ${c.x + r} ${c.y} H${right - r} A${r} ${r} 0 0 1 ${right} ${c.y + r} V${bottom} H${c.x} Z`
+  }, parent);
+}
+
 function sceneColumns(svg, d, s) {
   const parts = [
     ['Rectangular', d.rect, COLORS.rect],
@@ -675,6 +706,7 @@ function sceneColumns(svg, d, s) {
     ['Combined', d.comb, COLORS.comb]
   ];
   parts.forEach(([name, part, color], k) => {
+    sceneCard(svg, k, color);
     sceneBeam(svg, colX(k, 0), COLS.beamY, COLS.px);
     for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
     const a = forceArrow(k, part.F, part.x);
@@ -682,7 +714,7 @@ function sceneColumns(svg, d, s) {
     const lines = sceneColumnLines(name, part, d);
     lines.forEach((str, i) => {
       if (str === '') return;
-      sceneText(svg, COLS.x[k], COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
+      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
     });
   });
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { VB, BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline } from '../src/layout.js';
+import { VB, BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from '../src/layout.js';
 import { BEAM_L, LOADED_L, loadAt, equivalents } from '../src/physics.js';
 
 const EPS = 1e-9;
@@ -351,4 +351,97 @@ test('the browser harness hard-codes the same column geometry as layout.js (chec
   assert.ok(line, 'the constants line is present');
   assert.deepEqual(JSON.parse(line[1]), COLS.x);
   assert.deepEqual(line.slice(2).map(Number), [COLS.offset, COLS.px, COLS.beamY, COLS.band, BEAM_H, LOADED_L]);
+});
+
+test('the browser harness hard-codes the same card geometry as layout.js (the containment check would drift silently otherwise)', () => {
+  const src = readFileSync(new URL('../tools/browser-harness.js', import.meta.url), 'utf8');
+  const line = src.match(/const CARD_DX = (-?\d+), CARD_W = (\d+), CARD_Y = (\d+), CARD_BOTTOM = (\d+);/);
+  assert.ok(line, 'the card constants line is present');
+  assert.deepEqual(line.slice(1).map(Number), [COLS.card.dx, COLS.card.w, COLS.card.y, COLS.card.bottom]);
+});
+
+// ---- the card of each equivalent-force column --------------------------------------------------
+const CARD_TEXT_MAX = 272;   // the widest column text (verified), in units
+
+test('columnCard(k): the exact numbers, one card per column, x = COLS.x[k] - 4, width 300, y 240 to 558, rx 8, heading 74 tall', () => {
+  assert.equal(COLS.textPad, 8);
+  assert.deepEqual(columnCard(0), { x: 16, y: 240, w: 300, h: 318, rx: 8, headH: 74 });
+  assert.deepEqual(columnCard(1), { x: 326, y: 240, w: 300, h: 318, rx: 8, headH: 74 });
+  assert.deepEqual(columnCard(2), { x: 636, y: 240, w: 300, h: 318, rx: 8, headH: 74 });
+  for (let k = 0; k < 3; k++) assert.equal(columnCard(k).x, COLS.x[k] - 4);
+  assert.deepEqual(COLS.card, { dx: -4, w: 300, y: 240, bottom: 558, rx: 8, headH: 74, stroke: 1.5 });
+});
+
+test('the cards do not overlap (a 10 unit gap between neighbours) and lie inside the viewBox, stroke included', () => {
+  const c = [0, 1, 2].map(columnCard);
+  for (let k = 0; k < 2; k++) assert.equal(c[k + 1].x - (c[k].x + c[k].w), 10, `gap ${k}`);
+  assert.equal(COLS.x[1] - COLS.x[0] - c[0].w, 10);
+  const half = COLS.card.stroke / 2;
+  for (const k of c) {
+    assert.ok(k.x - half >= 0 && k.x + k.w + half <= VB.w, 'inside in x');
+    assert.ok(k.y - half >= 0 && k.y + k.h + half <= VB.h, 'inside in y');
+  }
+  assert.equal(c[0].y + c[0].h, COLS.card.bottom);
+});
+
+test('the heading band starts at the card top, ends above the arrow band, and holds the three text lines with the text pad', () => {
+  for (let k = 0; k < 3; k++) {
+    const c = columnCard(k);
+    assert.equal(c.y, COLS.card.y);
+    assert.ok(c.y + c.headH <= COLS.beamY - COLS.band, `band end ${c.y + c.headH} <= ${COLS.beamY - COLS.band}`);
+    assert.ok(c.headH < c.h && c.rx * 2 <= c.headH, 'the rounded top corners fit in the band');
+    // the three baselines, a 16-unit font (ascent about 16 above, a descender about 4 below) and the halo
+    assert.ok(COLS.textY[0] - 16 >= c.y, 'the first line starts below the card top');
+    assert.ok(COLS.textY[2] + 4 + 2 <= c.y + c.headH, 'the last line (descender and halo) ends inside the band');
+    // text pad plus the widest text fits the card's inner width
+    const left = COLS.x[k] + COLS.textPad;
+    assert.ok(left >= c.x + COLS.card.stroke);
+    assert.ok(COLS.textPad + CARD_TEXT_MAX <= c.w - (COLS.x[k] - c.x) - 4, `text right end ${left + CARD_TEXT_MAX} vs card right ${c.x + c.w}`);
+    assert.ok(left + CARD_TEXT_MAX < c.x + c.w);
+  }
+});
+
+test('everything of a column lies inside its card: the beam copy, wall hatching, circle C, the arrow band and the outline band', () => {
+  const pinR = BEAM_H / 2, wallW = 14, wallOver = 18;
+  for (let k = 0; k < 3; k++) {
+    const c = columnCard(k);
+    const x0 = colX(k, 0), x1 = colX(k, BEAM_L);
+    const inside = (x, y, what) => assert.ok(x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h, `${what} (${x}, ${y}) in card ${k}`);
+    inside(x0 - 2 * wallW, COLS.beamY - wallOver, 'wall hatching top-left');      // the hatch ends at wallX - wallW
+    inside(x0 - 2 * wallW, COLS.beamY + BEAM_H + wallOver, 'wall hatching bottom-left');
+    assert.equal(x0 - 2 * wallW, COLS.x[k] + COLS.offset - 28);
+    inside(x1 + pinR, COLS.beamY, 'circle C right edge');
+    inside(x1 + pinR, COLS.beamY + BEAM_H, 'circle C right edge, bottom');
+    inside(x0, COLS.beamY - COLS.band, 'arrow and outline band top-left');
+    inside(x1, COLS.beamY + BEAM_H + COLS.band, 'arrow and outline band bottom-right');
+    assert.ok(COLS.beamY - COLS.band >= c.y + c.headH, 'the band lies below the heading');
+    assert.ok(COLS.beamY + BEAM_H + COLS.band <= c.y + c.h);
+  }
+});
+
+test('over the slider grid every outline point and every force arrow (head width included) lies inside its column card', () => {
+  let states = 0, points = 0, arrows = 0;
+  for (const peak of ['A', 'B']) for (let r = -200; r <= 200; r += 5) for (let t = -200; t <= 200; t += 5) {
+    const s = { r, t, peak };
+    const e = equivalents(s);
+    const parts = [e.rect, e.tri, e.comb];
+    for (let k = 0; k < 3; k++) {
+      const c = columnCard(k);
+      const inX = (x) => x >= c.x && x <= c.x + c.w;
+      const inY = (y) => y >= c.y + c.headH && y <= c.y + c.h;
+      for (const poly of columnOutline(k, s)) for (const [x, y] of poly) {
+        assert.ok(inX(x) && inY(y), `outline point ${x},${y} k=${k} ${JSON.stringify(s)}`);
+        points++;
+      }
+      const a = forceArrow(k, parts[k].F, parts[k].x);
+      if (a) {
+        assert.ok(inX(a.x - 7) && inX(a.x + 7) && inY(a.yTail) && inY(a.yHead), `arrow k=${k} ${JSON.stringify(s)}`);
+        arrows++;
+      }
+      states++;
+    }
+  }
+  assert.equal(states, 2 * 81 * 81 * 3);
+  assert.ok(points > 60000, `a non-vacuous count of outline points (${points})`);
+  assert.ok(arrows > 20000, `a non-vacuous count of arrows (${arrows})`);
 });

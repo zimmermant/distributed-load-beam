@@ -4,7 +4,7 @@ import { stubElement, installSvgDocument } from './stub-dom.js';
 import { createScene } from '../src/scene.js';
 import { COLORS } from '../src/svg.js';
 import { BEAM_L, LOADED_L } from '../src/physics.js';
-import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline } from '../src/layout.js';
+import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from '../src/layout.js';
 import { derive } from '../src/state.js';
 
 installSvgDocument();
@@ -27,11 +27,12 @@ const STATES = [
   { r: -200, t: 0, peak: 'A' }, { r: 100, t: -190, peak: 'A' }, { r: -100, t: 100, peak: 'A' }
 ];
 
-test('every graphic element carries class g and every text class t or tin', () => {
+test('every graphic element carries class g (except the six card elements) and every text class t or tin', () => {
   for (const s of STATES) {
     const svg = draw(s);
     assert.ok(svg.children.length > 40, 'something was drawn');
     for (const n of svg.children) {
+      if (classes(n).includes('card')) continue;
       if (n.tag === 'text') assert.ok(['t', 'tin'].includes(n.attrs.class), `${JSON.stringify(s)} text "${n.textContent}" class ${n.attrs.class}`);
       else assert.ok(classes(n).includes('g'), `${JSON.stringify(s)} <${n.tag}> class ${n.attrs.class}`);
     }
@@ -176,8 +177,8 @@ test('equivalent-force arrows: fixed scale, right place, right colour, none for 
 test('the load shapes: rectangle and triangle, translucent, dashed, absent at zero, apex at the peak end', () => {
   for (const s of STATES) {
     const svg = draw(s);
-    const rects = svg.children.filter(n => n.tag === 'rect' && n.attrs.fill === COLORS.rect);
-    const paths = svg.children.filter(n => n.tag === 'path' && n.attrs.fill === COLORS.tri);
+    const rects = svg.children.filter(n => n.tag === 'rect' && n.attrs.fill === COLORS.rect && !classes(n).includes('card'));
+    const paths = svg.children.filter(n => n.tag === 'path' && n.attrs.fill === COLORS.tri && !classes(n).includes('card'));
     const want = loadShapes(s);
     assert.equal(rects.length, want.rect ? 1 : 0, JSON.stringify(s));
     assert.equal(paths.length, want.tri ? 1 : 0, JSON.stringify(s));
@@ -234,13 +235,14 @@ function columnTexts(svg) {
   return texts(svg).filter(n => n.attrs.class === 't' && COLS.textY.includes(num(n.attrs.y)));
 }
 
-test('column texts: name, force and location at COLS.x[k] on the three text rows', () => {
+test('column texts: name, force and location at COLS.x[k] + the text pad on the three text rows', () => {
   const svg = draw({ r: 100, t: 100, peak: 'B' });
   const got = columnTexts(svg).map(n => [n.textContent, num(n.attrs.x), num(n.attrs.y), n.attrs.fill, n.attrs['font-weight']]);
   const want = [];
   [['Rectangular', '200 N down', 'at x = 1.00 m from A', COLORS.rect], ['Triangular', '100 N down', 'at x = 1.33 m from A', COLORS.tri],
     ['Combined', '300 N down', 'at x = 1.11 m from A', COLORS.comb]].forEach(([a, b, c, color], k) => {
-    want.push([a, COLS.x[k], COLS.textY[0], color, '700'], [b, COLS.x[k], COLS.textY[1], color, '700'], [c, COLS.x[k], COLS.textY[2], COLORS.ink, '400']);
+    const x = COLS.x[k] + 8;
+    want.push([a, x, COLS.textY[0], color, '700'], [b, x, COLS.textY[1], color, '700'], [c, x, COLS.textY[2], COLORS.ink, '400']);
   });
   assert.deepEqual(got, want);
 });
@@ -291,7 +293,7 @@ test('a combined force that acts at the wall gets its arrow, drawn at the wall e
     const comb = arrows.filter(a => a.color === COLORS.comb);
     assert.equal(comb.length, 1);
     assert.equal(comb[0].x, colX(2, 0));
-    const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2]);
+    const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2] + COLS.textPad);
     assert.equal(third[0].textContent, 'at x = 0.00 m from A');
   }
 });
@@ -305,7 +307,7 @@ test('a combined force just off the wall (x = 0.10 m) gets its arrow and plain t
   const x = derive({ r: -130, t: 190, peak: 'B' }).comb.x;
   assert.ok(x > 0.09 && x < 0.11, `x ${x}`);
   assert.equal(comb[0].x, colX(2, x));
-  const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2]);
+  const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2] + COLS.textPad);
   assert.equal(third[0].textContent, 'at x = 0.10 m from A');
 });
 
@@ -399,5 +401,103 @@ test('outlines: the default state has an arrow inside each outline (by design) a
     const poly = columnOutline(k, STATES[0])[0];
     const xs = poly.map(p => p[0]);
     assert.ok(arrows[k].x > Math.min(...xs) && arrows[k].x < Math.max(...xs), `arrow ${k} lies between the outline's ends`);
+  }
+});
+
+// ---- the card and heading band of each equivalent-force column ----------------------------------
+const cardsOf = (svg) => svg.children.filter(n => classes(n).includes('card'));
+const COLUMN_TEXT_X = [0, 1, 2].map(k => COLS.x[k] + COLS.textPad);
+
+test('cards: exactly 3 cards and 3 bands for every state, none of them class g, all class card', () => {
+  for (const s of STATES) {
+    const c = cardsOf(draw(s));
+    assert.equal(c.length, 6, JSON.stringify(s));
+    assert.equal(c.filter(n => n.tag === 'rect').length, 3);
+    assert.equal(c.filter(n => n.tag === 'path').length, 3);
+    for (const n of c) assert.deepEqual(classes(n), ['card']);
+  }
+  const svg = draw(STATES[0]);
+  assert.equal(svg.children.filter(n => n.tag !== 'text' && !classes(n).includes('g') && !classes(n).includes('card')).length, 0);
+});
+
+test('cards: the framed card is the column geometry, tinted in the column colour (fill 0.05, stroke 0.45, width 1.5, rx 8)', () => {
+  const rects = cardsOf(draw(STATES[0])).filter(n => n.tag === 'rect');
+  assert.equal(rects.length, 3);
+  rects.forEach((n, k) => {
+    const c = columnCard(k);
+    assert.deepEqual([num(n.attrs.x), num(n.attrs.y), num(n.attrs.width), num(n.attrs.height), num(n.attrs.rx)], [c.x, c.y, c.w, c.h, c.rx]);
+    assert.equal(n.attrs.fill, COLUMN_COLORS[k]);
+    assert.equal(n.attrs['fill-opacity'], '0.05');
+    assert.equal(n.attrs.stroke, COLUMN_COLORS[k]);
+    assert.equal(n.attrs['stroke-opacity'], '0.45');
+    assert.equal(n.attrs['stroke-width'], '1.5');
+  });
+  assert.deepEqual([num(rects[0].attrs.x), num(rects[1].attrs.x), num(rects[2].attrs.x)], [16, 326, 636]);
+});
+
+test('cards: the heading band spans the card width over the first 74 units, fill 0.12, no stroke, top corners rounded and bottom corners square', () => {
+  const bands = cardsOf(draw(STATES[0])).filter(n => n.tag === 'path');
+  assert.equal(bands.length, 3);
+  bands.forEach((n, k) => {
+    const c = columnCard(k);
+    assert.equal(n.attrs.fill, COLUMN_COLORS[k]);
+    assert.equal(n.attrs['fill-opacity'], '0.12');
+    assert.ok(n.attrs.stroke === undefined || n.attrs.stroke === 'none', 'no stroke');
+    const r = c.rx, x1 = c.x + c.w, y1 = c.y + c.headH;
+    assert.equal(n.attrs.d, `M${c.x} ${c.y + r} A${r} ${r} 0 0 1 ${c.x + r} ${c.y} H${x1 - r} A${r} ${r} 0 0 1 ${x1} ${c.y + r} V${y1} H${c.x} Z`);
+    assert.equal((n.attrs.d.match(/A/g) || []).length, 2, 'exactly the two top corners are arcs');
+  });
+});
+
+test('cards: draw order per column is card, band, beam copy, outlines, arrow, texts (the card never hides content)', () => {
+  for (const s of [STATES[0], STATES[3], STATES[8]]) {
+    const kids = draw(s).children;
+    const at = (pred) => kids.map((n, i) => [n, i]).filter(([n]) => pred(n)).map(([, i]) => i);
+    const cardIx = at(n => n.tag === 'rect' && classes(n).includes('card'));
+    const bandIx = at(n => n.tag === 'path' && classes(n).includes('card'));
+    const beamIx = at(n => n.tag === 'rect' && n.attrs.fill === COLORS.beam).slice(1);   // the first is the top figure's
+    assert.equal(cardIx.length, 3);
+    assert.equal(beamIx.length, 3);
+    for (let k = 0; k < 3; k++) {
+      assert.equal(bandIx[k], cardIx[k] + 1, `column ${k}: the band directly follows its card`);
+      assert.equal(beamIx[k], cardIx[k] + 2, `column ${k}: the beam copy directly follows the band`);
+      const end = k < 2 ? cardIx[k + 1] : kids.length;
+      const mine = kids.map((n, i) => [n, i]).filter(([, i]) => i > cardIx[k] && i < end);
+      const first = (pred) => { const f = mine.find(([n]) => pred(n)); return f ? f[1] : -1; };
+      const out = mine.filter(([n]) => classes(n).includes('outline')).map(([, i]) => i);
+      const arrow = first(n => n.tag === 'g' && n.children[0] && n.children[0].attrs['stroke-width'] === '3.4');
+      const txt = mine.filter(([n]) => n.tag === 'text' && n.attrs.class === 't').map(([, i]) => i);
+      assert.equal(txt.length, 3, `column ${k}: three heading lines`);
+      for (const i of out) assert.ok(i > beamIx[k], 'outline after the beam');
+      if (arrow >= 0) {
+        for (const i of out) assert.ok(i < arrow, 'outline before the arrow');
+        for (const i of txt) assert.ok(i > arrow, 'text after the arrow');
+      }
+      for (const i of txt) assert.ok(i > Math.max(...out, beamIx[k]), 'text after outlines and beam');
+      // nothing of the column comes before its own card
+      assert.ok(cardIx[k] < beamIx[k]);
+    }
+  }
+});
+
+test('cards: each card is the first thing of its column: nothing with a column x in that column is drawn before it', () => {
+  const kids = draw(STATES[0]).children;
+  const firstCol = kids.findIndex(n => n.tag === 'rect' && classes(n).includes('card'));
+  assert.ok(firstCol > 0);
+  const before = kids.slice(0, firstCol);
+  assert.ok(before.every(n => !(n.tag === 'rect' && n.attrs.fill === COLORS.beam && num(n.attrs.y) === COLS.beamY)), 'no column beam before the first card');
+  assert.ok(before.every(n => n.tag !== 'text' || !COLS.textY.includes(num(n.attrs.y))), 'no column text before the first card');
+});
+
+test('cards: the heading texts are left-padded: x = COLS.x[k] + 8, on the three baselines, every state', () => {
+  for (const s of STATES) {
+    const t = columnTexts(draw(s));
+    assert.equal(t.length, 9, JSON.stringify(s));
+    // columnTexts is in document order: column 0 rows 0-2, column 1 rows 0-2, column 2 rows 0-2
+    for (let k = 0; k < 3; k++) {
+      const col = t.slice(k * 3, k * 3 + 3);
+      assert.deepEqual(col.map(n => num(n.attrs.x)), [COLUMN_TEXT_X[k], COLUMN_TEXT_X[k], COLUMN_TEXT_X[k]]);
+      assert.deepEqual(col.map(n => num(n.attrs.y)), COLS.textY);
+    }
   }
 });

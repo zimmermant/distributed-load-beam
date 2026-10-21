@@ -2,7 +2,7 @@ import { BEAM_L, LOADED_L } from './physics.js';
 import { fmt, forceWords, locWords } from './format.js';
 import { el, clear, text, COLORS } from './svg.js';
 import { derive } from './state.js';
-import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline } from './layout.js';
+import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from './layout.js';
 
 // Drawing style only: every position and length comes from layout.js.
 const SCENE_TEXT = 16;            // every text is at least this many units (12 px at 800 px wide)
@@ -16,6 +16,9 @@ const SCENE_WALL_OVER = 18;       // the wall rises this far above and below the
 const SCENE_HATCHES = 4;
 const SCENE_PIN_R = BEAM_H / 2;   // the A, B, C circles exactly fill the beam's height
 const SCENE_HEAD_MAX = 9;         // arrow head length cap
+const SCENE_CARD_FILL = 0.05;     // the column card's tint
+const SCENE_CARD_STROKE = 0.45;   // the column card's frame opacity
+const SCENE_CARD_HEAD = 0.12;     // the heading band's tint
 
 // A text node with its class set (svg.js's text() takes no class option).
 function sceneText(parent, x, y, str, opts, cls = 't') {
@@ -138,6 +141,22 @@ function sceneOutline(parent, poly, color) {
   }, parent);
 }
 
+// The card of column k: a tinted, framed rounded rectangle, then its heading band (the same tint, darker,
+// square at the bottom and rounded like the card at the top). Class `card`, not `g`: the harness's
+// text-versus-graphic checks must ignore them.
+function sceneCard(parent, k, color) {
+  const c = columnCard(k);
+  el('rect', {
+    class: 'card', x: c.x, y: c.y, width: c.w, height: c.h, rx: c.rx, fill: color, 'fill-opacity': SCENE_CARD_FILL,
+    stroke: color, 'stroke-opacity': SCENE_CARD_STROKE, 'stroke-width': COLS.card.stroke
+  }, parent);
+  const r = c.rx, right = c.x + c.w, bottom = c.y + c.headH;
+  el('path', {
+    class: 'card', fill: color, 'fill-opacity': SCENE_CARD_HEAD,
+    d: `M${c.x} ${c.y + r} A${r} ${r} 0 0 1 ${c.x + r} ${c.y} H${right - r} A${r} ${r} 0 0 1 ${right} ${c.y + r} V${bottom} H${c.x} Z`
+  }, parent);
+}
+
 function sceneColumns(svg, d, s) {
   const parts = [
     ['Rectangular', d.rect, COLORS.rect],
@@ -145,6 +164,7 @@ function sceneColumns(svg, d, s) {
     ['Combined', d.comb, COLORS.comb]
   ];
   parts.forEach(([name, part, color], k) => {
+    sceneCard(svg, k, color);
     sceneBeam(svg, colX(k, 0), COLS.beamY, COLS.px);
     for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
     const a = forceArrow(k, part.F, part.x);
@@ -152,7 +172,7 @@ function sceneColumns(svg, d, s) {
     const lines = sceneColumnLines(name, part, d);
     lines.forEach((str, i) => {
       if (str === '') return;
-      sceneText(svg, COLS.x[k], COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
+      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
     });
   });
 }

@@ -20,10 +20,11 @@
 //                pointer-style input) and the peak buttons, over the 9x9 grid of r,t x both
 //                peaks plus the near-cancel sets, and after each state runs checkFigure.
 //                It also checks the drive worked (slider values, readouts, pressed button).
-//   sensitivity  plants four texts: one on the beam (and only the beam), one on another text,
-//                one past the viewBox edge, one at font-size 10, and two dotted-outline paths (one
-//                above the column band, one between the columns); requires checkFigure to name
-//                each, and a clean figure after removal: proves the checker can see each fault.
+//   sensitivity  plants five texts: one on the beam (and only the beam), one on another text,
+//                one past the viewBox edge, one at font-size 10, one straddling a column card's edge,
+//                and two dotted-outline paths (one above the column band, one between the columns);
+//                requires checkFigure to name each, and a clean figure after removal: proves the
+//                checker can see each fault.
 //   budget       the page fits (scrollHeight <= innerHeight), the sticky controls row (controls and
 //                calculation, below the figure at every width) does not cover the figure, #controls
 //                and #calc show all their content, bottoms <= innerHeight, no horizontal scroll. (The row is position: sticky; bottom: 0, so a
@@ -45,6 +46,9 @@
   // Column geometry for check 7, the same numbers as COLS, BEAM_H and LOADED_L in src/layout.js
   // (test/layout.test.js reads this file and fails if they drift apart).
   const COLS_X = [20, 330, 640], COLS_OFFSET = 30, COLS_PX = 60, COLS_BEAM_Y = 424, COLS_BAND = 108, BEAM_H = 24, LOADED_L = 2;
+  // The column cards, the same numbers as COLS.card in src/layout.js (the drift test reads this line too).
+  const CARD_DX = -4, CARD_W = 300, CARD_Y = 240, CARD_BOTTOM = 558;
+  const MIN_IN_CARD = 40;              // check 9 floor: a figure holds 9 column texts, 9 letters and at least 27 beam-copy graphics below the top figure
   const OUTLINE_Y = [COLS_BEAM_Y - COLS_BAND, COLS_BEAM_Y + BEAM_H + COLS_BAND];
   const OUTLINE_X = COLS_X.map(x => [x + COLS_OFFSET, x + COLS_OFFSET + LOADED_L * COLS_PX]);
   const EPS = 0.01;
@@ -92,6 +96,7 @@
     const tins = Array.from(fig.querySelectorAll('text.tin')).map(el => ({ el, b: box(el) }));
     const gs = topLevelG().map(el => ({ el, b: box(el) }));
     const outlines = Array.from(fig.querySelectorAll('.outline')).map(el => ({ el, b: box(el) }));
+    const cards = Array.from(fig.querySelectorAll('rect.card')).map(box);                                        // check 9
     const pcs = gs.filter(g => g.el.classList.contains('pc'));
     const arrows = gs.filter(g => !g.el.classList.contains('pc') &&
       g.el.tagName === 'g' && g.el.firstElementChild && g.el.firstElementChild.tagName === 'line');
@@ -115,6 +120,25 @@
       const inX = OUTLINE_X.some(([a, z]) => o.b.x0 >= a - EPS && o.b.x1 <= z + EPS);
       if (!inY || !inX) bad(`${name(o.el, o.b)} outside its column band`);
     }
+    // 9: the three column cards are where layout.js puts them, and every text and top-level graphic below the top figure
+    // (centre at or below the card tops) lies inside the card whose x-range holds its centre (0.5 tolerance); .card elements are not .g.
+    if (cards.length !== 3) bad(`found ${cards.length} column cards (expected 3)`);
+    cards.forEach((c, k) => {
+      const w = [COLS_X[k] + CARD_DX, CARD_Y, COLS_X[k] + CARD_DX + CARD_W, CARD_BOTTOM];
+      if ([c.x0, c.y0, c.x1, c.y1].some((v, i) => Math.abs(v - w[i]) > EPS)) bad(`card ${k} is at ${[c.x0, c.y0, c.x1, c.y1].map(r1).join(',')}, expected ${w.join(',')}`);
+    });
+    let inCard = 0;
+    if (cards.length === 3) {
+      for (const x of texts.concat(tins, gs)) {
+        if ((x.b.y0 + x.b.y1) / 2 < CARD_Y) continue;
+        const cx = (x.b.x0 + x.b.x1) / 2;
+        const c = cards.find(k => cx >= k.x0 && cx <= k.x1);
+        inCard++;
+        if (!c) bad(`${name(x.el, x.b)} lies in no card`);
+        else if (x.b.x0 < c.x0 - TOL || x.b.x1 > c.x1 + TOL || x.b.y0 < c.y0 - TOL || x.b.y1 > c.y1 + TOL) bad(`${name(x.el, x.b)} outside its card`);
+      }
+    }
+    if (inCard < MIN_IN_CARD) bad(`only ${inCard} elements checked against the cards (< ${MIN_IN_CARD}): check 9 is vacuous`);
     if (texts.length + tins.length < MIN_TEXTS) bad(`only ${texts.length + tins.length} texts found (< ${MIN_TEXTS}): the checks are vacuous`);
     if (gs.length < MIN_GS) bad(`only ${gs.length} top-level .g found (< ${MIN_GS}): the checks are vacuous`);
 
@@ -218,6 +242,7 @@
       put(first.getAttribute('x'), first.getAttribute('y'), 'PROBE2', 16);   // 2: exactly on an existing label
       put(950, 300, 'PROBE3', 16);                                             // 3: runs past x = 960
       put(500, 520, 'PROBE4', 10);                                             // 4: renders below 12 px
+      put(300, 520, 'PROBE7 STRADDLES', 16);                                   // 7: starts left of card 1 (x 326), so it crosses the edge between cards 0 and 1
       // 5, 6: dotted outlines outside their band: above the column band (y 20..40), and between the columns in x (296..312)
       planted.push(plantOutline(700, 20, 760, 40));
       planted.push(plantOutline(296, 440, 312, 460));
@@ -233,14 +258,17 @@
       const outYCaught = outNamed.filter(v => v.includes('@700,20-760,40')).length === 1;
       const outXCaught = outNamed.filter(v => v.includes('@296,440-312,460')).length === 1;
       const outOnlyPlanted = outNamed.length === 2;       // no genuine outline is flagged
-      r = { beamCaught, textCaught, clipCaught, smallCaught, outYCaught, outXCaught, outOnlyPlanted, named: named.length + outNamed.length };
+      const cardNamed = all.filter(v => v.includes('outside its card'));
+      const cardCaught = cardNamed.filter(v => v.includes('PROBE7')).length === 1;
+      const cardOnlyPlanted = cardNamed.length === 1;     // no genuine column element is flagged
+      r = { beamCaught, textCaught, clipCaught, smallCaught, outYCaught, outXCaught, outOnlyPlanted, cardCaught, cardOnlyPlanted, named: named.length + outNamed.length };
     } finally {
       for (const n of planted) n.remove();
       restore();
     }
     r.cleanAfter = checkFigure('after').violations.length === 0;
     r.flagged = r.beamCaught && r.textCaught && r.clipCaught && r.smallCaught &&
-      r.outYCaught && r.outXCaught && r.outOnlyPlanted && r.cleanAfter;
+      r.outYCaught && r.outXCaught && r.outOnlyPlanted && r.cardCaught && r.cardOnlyPlanted && r.cleanAfter;
     return r;
   }
 

@@ -9,7 +9,13 @@ export const BEAM_H = 24;
 // top figure (the actual load); `band` is the room above and below the beam
 export const TOP = { x0: 90, px: 150, beamY: 90, unit: 0.2, band: 80, dimY: 206, dimTextY: 228, textX: 730 };
 // three columns (the equivalent forces); fs is the FIXED force scale, units per newton
-export const COLS = { x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306] };
+// `card` is the framed, tinted card around each column: dx from COLS.x[k] to its left edge, w its width, y its top, bottom its
+// lower edge (its stroke must stay inside VB.h), rx the corner radius, headH the height of the heading band that holds the three
+// text lines (it must end above COLS.beamY - COLS.band), stroke the frame width. textPad is the left padding of those lines.
+export const COLS = {
+  x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306], textPad: 8,
+  card: { dx: -4, w: 300, y: 240, bottom: 558, rx: 8, headH: 74, stroke: 1.5 }
+};
 
 const LAYOUT_MIN_ARROW = 8;   // net-load arrows shorter than this are not drawn
 const LAYOUT_ARROWS = 8;
@@ -22,6 +28,12 @@ export function topX(x) {
 // column k (0 rect, 1 tri, 2 comb), metres from A -> viewBox x
 export function colX(k, x) {
   return COLS.x[k] + COLS.offset + x * COLS.px;
+}
+
+// The card of column k (0 rect, 1 tri, 2 comb): { x, y, w, h, rx, headH } in viewBox units.
+export function columnCard(k) {
+  const c = COLS.card;
+  return { x: COLS.x[k] + c.dx, y: c.y, w: c.w, h: c.bottom - c.y, rx: c.rx, headH: c.headH };
 }
 
 // One arrow of length len pointing at the beam from the side the sign says.
