@@ -40,27 +40,27 @@ test('fmtFixed: always dp decimals, U+2212, never -0.00, non-finite is a dash', 
 });
 
 test('forceWords: down, up, zero', () => {
-  assert.equal(forceWords(200), '200 N down');
-  assert.equal(forceWords(-10), '10 N up');
-  assert.equal(forceWords(0), '0 N');
-  assert.equal(forceWords(-0), '0 N');
-  assert.equal(forceWords(100 / 3), '33.33 N down');
-  assert.equal(forceWords(-0.001), '0 N');
+  assert.equal(forceWords(200), '200\u00a0N down');
+  assert.equal(forceWords(-10), '10\u00a0N up');
+  assert.equal(forceWords(0), '0\u00a0N');
+  assert.equal(forceWords(-0), '0\u00a0N');
+  assert.equal(forceWords(100 / 3), '33.33\u00a0N down');
+  assert.equal(forceWords(-0.001), '0\u00a0N');
 });
 
 test('locWords: null, on the beam, off the beam', () => {
   assert.equal(locWords(null), '');
-  assert.equal(locWords(1), 'at x = 1.00 m from A');
-  assert.equal(locWords(1.1111), 'at x = 1.11 m from A');
-  assert.equal(locWords(0), 'at x = 0.00 m from A');
-  assert.equal(locWords(-0), 'at x = 0.00 m from A');
-  assert.equal(locWords(0.05), 'at x = 0.05 m from A');
-  assert.equal(locWords(0.12), 'at x = 0.12 m from A');
-  assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
-  assert.equal(locWords(4), 'at x = 4.00 m from A');
+  assert.equal(locWords(1), 'at x = 1.00\u00a0m from A');
+  assert.equal(locWords(1.1111), 'at x = 1.11\u00a0m from A');
+  assert.equal(locWords(0), 'at x = 0.00\u00a0m from A');
+  assert.equal(locWords(-0), 'at x = 0.00\u00a0m from A');
+  assert.equal(locWords(0.05), 'at x = 0.05\u00a0m from A');
+  assert.equal(locWords(0.12), 'at x = 0.12\u00a0m from A');
+  assert.equal(locWords(-0.001), 'at x = 0.00\u00a0m from A');
+  assert.equal(locWords(4), 'at x = 4.00\u00a0m from A');
   assert.ok(locWords(-16 / 3).endsWith('(off the beam)'));
-  assert.equal(locWords(-16 / 3), 'at x = −5.33 m from A (off the beam)');
-  assert.equal(locWords(4.5), 'at x = 4.50 m from A (off the beam)');
+  assert.equal(locWords(-16 / 3), 'at x = −5.33\u00a0m from A (off the beam)');
+  assert.equal(locWords(4.5), 'at x = 4.50\u00a0m from A (off the beam)');
 });
 
 test('no forceWords/locWords result contains -0, NaN or Infinity', () => {
@@ -84,14 +84,14 @@ test('no forceWords/locWords result contains -0, NaN or Infinity', () => {
 });
 
 test('locWords: no wall wording anywhere on the beam; off the beam is judged on the printed value', () => {
-  assert.equal(locWords(0.1199), 'at x = 0.12 m from A');
-  assert.equal(locWords(0.1), 'at x = 0.10 m from A');
-  assert.equal(locWords(0.005), 'at x = 0.01 m from A');
-  assert.equal(locWords(0.0049), 'at x = 0.00 m from A');
-  assert.equal(locWords(0.5), 'at x = 0.50 m from A');
-  assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
-  assert.equal(locWords(-0.0049), 'at x = 0.00 m from A');
-  assert.equal(locWords(-0.2), 'at x = −0.20 m from A (off the beam)');
-  assert.equal(locWords(-0.005), 'at x = −0.01 m from A (off the beam)');
+  assert.equal(locWords(0.1199), 'at x = 0.12\u00a0m from A');
+  assert.equal(locWords(0.1), 'at x = 0.10\u00a0m from A');
+  assert.equal(locWords(0.005), 'at x = 0.01\u00a0m from A');
+  assert.equal(locWords(0.0049), 'at x = 0.00\u00a0m from A');
+  assert.equal(locWords(0.5), 'at x = 0.50\u00a0m from A');
+  assert.equal(locWords(-0.001), 'at x = 0.00\u00a0m from A');
+  assert.equal(locWords(-0.0049), 'at x = 0.00\u00a0m from A');
+  assert.equal(locWords(-0.2), 'at x = −0.20\u00a0m from A (off the beam)');
+  assert.equal(locWords(-0.005), 'at x = −0.01\u00a0m from A (off the beam)');
   for (let x = -0.3; x <= 0.3; x += 0.001) assert.ok(!/wall/.test(locWords(x)), `${x}: ${locWords(x)}`);
 });

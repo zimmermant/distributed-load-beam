@@ -1,5 +1,5 @@
 import { LOADED_L, BEAM_L } from './physics.js';
-import { MINUS, fmt, fmtFixed } from './format.js';
+import { MINUS, NBSP, fmt, fmtFixed } from './format.js';
 import { derive } from './state.js';
 
 // The calculation, written out with the numbers substituted. Every number comes from
@@ -7,25 +7,29 @@ import { derive } from './state.js';
 // string, so no URL text can reach this HTML.
 const PANEL_XBAR = 'x̄';
 
-// A negative number inside a sum or product is written in parentheses.
-function panelPar(n) {
+// Every number is followed by its unit (N, N/m or m), also inside a formula. A negative number
+// inside a sum or product is written in parentheses, unit inside: (−190 N/m).
+const PANEL_N = 'N';
+const PANEL_NPM = 'N/m';
+const PANEL_M = 'm';
+function panelPar(n, unit) {
   const text = fmt(n);
-  return text.startsWith(MINUS) ? `(${text})` : text;
+  return text.startsWith(MINUS) ? `(${text}${NBSP}${unit})` : `${text}${NBSP}${unit}`;
 }
 
 function panelRect(d, s) {
   const name = '<span class="c-rect"><b>Rectangle</b></span>';
-  if (d.rect.F === 0) return `${name}: w = 0, so there is no rectangular load and no force from it.`;
-  return `${name} (constant w): F = w × L = ${panelPar(s.r)} × ${fmt(LOADED_L)} = <b>${fmt(d.rect.F)} N</b>, ` +
-    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)} m`;
+  if (d.rect.F === 0) return `${name}: w = 0${NBSP}${PANEL_NPM}, so there is no rectangular load and no force from it.`;
+  return `${name} (constant w): F = w × L = ${panelPar(s.r, PANEL_NPM)} × ${fmt(LOADED_L)}${NBSP}${PANEL_M} = <b>${fmt(d.rect.F)}${NBSP}${PANEL_N}</b>, ` +
+    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)}${NBSP}${PANEL_M}`;
 }
 
 function panelTri(d, s) {
   const peak = s.peak === 'A' ? 'A' : 'B';          // never raw text into innerHTML
   const name = '<span class="c-tri"><b>Triangle</b></span>';
-  if (d.tri.F === 0) return `${name}: peak = 0, so there is no triangular load and no force from it.`;
-  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t)} × ${fmt(LOADED_L)} = <b>${fmt(d.tri.F)} N</b>, ` +
-    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)} m`;
+  if (d.tri.F === 0) return `${name}: peak = 0${NBSP}${PANEL_NPM}, so there is no triangular load and no force from it.`;
+  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t, PANEL_NPM)} × ${fmt(LOADED_L)}${NBSP}${PANEL_M} = <b>${fmt(d.tri.F)}${NBSP}${PANEL_N}</b>, ` +
+    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)}${NBSP}${PANEL_M}`;
 }
 
 // A word when the combined force acts off the beam (judged on the printed value).
@@ -44,17 +48,17 @@ function panelNeedsExact(d) {
 
 function panelComb(d) {
   const name = '<span class="c-comb"><b>Combined</b></span>';
-  const sum = `F = ${panelPar(d.rect.F)} + (${fmt(d.tri.F)}) = <b>${fmt(d.comb.F)} N</b>`;
+  const sum = `F = ${panelPar(d.rect.F, PANEL_N)} + (${fmt(d.tri.F)}${NBSP}${PANEL_N}) = <b>${fmt(d.comb.F)}${NBSP}${PANEL_N}</b>`;
   if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so there is no combined force.`;
   if (d.comb.F === 0) return `${name}: ${sum}: the two parts cancel, so no single force replaces them.`;
   if (d.rect.F === 0 || d.tri.F === 0) {
     const only = d.rect.F === 0 ? 'triangle' : 'rectangle';
-    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)} m</b> ` +
+    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)}${NBSP}${PANEL_M}</b> ` +
       `(only the ${only} acts, so its location is the combined one)${panelWhere(d.comb.x)}`;
   }
-  const num = `${panelPar(d.rect.F)} × ${fmtFixed(d.rect.x)} + ${panelPar(d.tri.F)} × ${fmtFixed(d.tri.x)}`;
+  const num = `${panelPar(d.rect.F, PANEL_N)} × ${fmtFixed(d.rect.x)}${NBSP}${PANEL_M} + ${panelPar(d.tri.F, PANEL_N)} × ${fmtFixed(d.tri.x)}${NBSP}${PANEL_M}`;
   const exact = panelNeedsExact(d) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
-  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F)} = <b>${fmtFixed(d.comb.x)} m</b>` +
+  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F, PANEL_N)} = <b>${fmtFixed(d.comb.x)}${NBSP}${PANEL_M}</b>` +
     `${panelWhere(d.comb.x)}${exact}`;
 }
 

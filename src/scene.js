@@ -1,5 +1,5 @@
 import { BEAM_L, LOADED_L } from './physics.js';
-import { fmt, forceWords, locWords } from './format.js';
+import { NBSP, fmt, forceWords, locWords } from './format.js';
 import { el, clear, text, COLORS } from './svg.js';
 import { derive } from './state.js';
 import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from './layout.js';
@@ -68,8 +68,8 @@ function sceneBeam(parent, x0, y, px) {
 function sceneTopLines(s) {
   const lines = [['Actual load on AB', COLORS.ink, true]];
   const entries = [
-    [`Rectangular: ${fmt(s.r, 0)} N/m`, COLORS.rect],
-    [`Triangular: peak ${fmt(s.t, 0)} N/m at ${s.peak}`, COLORS.tri]
+    [`Rectangular: ${fmt(s.r, 0)}${NBSP}N/m`, COLORS.rect],
+    [`Triangular: peak ${fmt(s.t, 0)}${NBSP}N/m at ${s.peak}`, COLORS.tri]
   ];
   for (const [str, color] of entries) {
     if (str.length <= SCENE_LINE_MAX) { lines.push([str, color, false]); continue; }
@@ -89,7 +89,7 @@ function sceneColumnLines(name, part, d) {
   } else {
     third = locWords(part.x);
   }
-  return [name, F === 0 ? '0 N' : forceWords(F), third];
+  return [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
 }
 
 function sceneTop(svg, s) {
@@ -120,8 +120,8 @@ function sceneTop(svg, s) {
   el('line', { x1: xB, y1: y - tick, x2: xB, y2: y + tick, stroke: COLORS.outline }, g);
   el('line', { x1: xB, y1: y, x2: xC, y2: y, stroke: COLORS.beam, 'stroke-dasharray': '4 3' }, g);
   el('line', { x1: xC, y1: y - tick, x2: xC, y2: y + tick, stroke: COLORS.beam }, g);
-  sceneText(svg, (xA + xB) / 2, TOP.dimTextY, 'AB = 2 m (loaded)', { anchor: 'middle' });
-  sceneText(svg, (xB + xC) / 2, TOP.dimTextY, 'BC = 2 m (no load)', { anchor: 'middle' }).setAttribute('opacity', 0.6);
+  sceneText(svg, (xA + xB) / 2, TOP.dimTextY, `AB = 2${NBSP}m (loaded)`, { anchor: 'middle' });
+  sceneText(svg, (xB + xC) / 2, TOP.dimTextY, `BC = 2${NBSP}m (no load)`, { anchor: 'middle' }).setAttribute('opacity', 0.6);
 
   // heading, rectangular, triangular (one or two lines), then the sign note
   const dy = [-28, -6, 16, 38, 60];

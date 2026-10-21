@@ -17,8 +17,8 @@ test('no params gives no changes and an empty description', () => {
 test('all three params are read and described', () => {
   const p = parsePresets('?r=100&t=-190&peak=B');
   assert.deepStrictEqual(p, { ...EMPTY, r: 100, t: -190, peak: 'B' });
-  assert.strictEqual(describePresets(p), 'From the link: r = 100 N/m, t = −190 N/m, peak at B.');
-  assert.strictEqual(describePresets(parsePresets('?t=50')), 'From the link: t = 50 N/m.');
+  assert.strictEqual(describePresets(p), 'From the link: r = 100\u00a0N/m, t = −190\u00a0N/m, peak at B.');
+  assert.strictEqual(describePresets(parsePresets('?t=50')), 'From the link: t = 50\u00a0N/m.');
   assert.strictEqual(describePresets(parsePresets('?peak=a')), 'From the link: peak at A.');
 });
 
@@ -26,9 +26,9 @@ test('all three params are read and described', () => {
 test('r=7 is adjusted to 0 and says so', () => {
   const p = parse(['r', '7']);
   assert.strictEqual(p.r, 0);
-  assert.deepStrictEqual(p.adjusted, ['r 7 → 0']);
-  assert.strictEqual(describePresets(p), 'From the link: r = 0 N/m. Adjusted: r 7 → 0.');
-  assert.deepStrictEqual(parse(['t', '-47']).adjusted, ['t −47 → −45']);
+  assert.deepStrictEqual(p.adjusted, ['r 7\u00a0N/m → 0\u00a0N/m']);
+  assert.strictEqual(describePresets(p), 'From the link: r = 0\u00a0N/m. Adjusted: r 7\u00a0N/m → 0\u00a0N/m.');
+  assert.deepStrictEqual(parse(['t', '-47']).adjusted, ['t −47\u00a0N/m → −45\u00a0N/m']);
 });
 
 // Mutation: the note compares the raw numbers instead of what would be printed.
@@ -68,19 +68,19 @@ test('peak=c is ignored; peak=b is accepted as B', () => {
   assert.strictEqual(parse(['peak', 'a']).peak, 'A');
   // the description lists only what was set, then Adjusted, then Ignored
   assert.strictEqual(describePresets(parsePresets('?r=100&t=-190&peak=c')),
-    'From the link: r = 100 N/m, t = −190 N/m. Ignored: peak=c (use A or B).');
+    'From the link: r = 100\u00a0N/m, t = −190\u00a0N/m. Ignored: peak=c (use A or B).');
   assert.strictEqual(describePresets(parsePresets('?peak=c')), 'From the link: nothing set. Ignored: peak=c (use A or B).');
   assert.strictEqual(describePresets(parsePresets('?r=abc&t=x')),
     'From the link: nothing set. Ignored: r=abc (use a number of N/m); t=x (use a number of N/m).');
   // Adjusted with nothing set cannot come from parsePresets (an adjusted value is a set value), so pin it directly
-  assert.strictEqual(describePresets({ r: undefined, t: undefined, peak: undefined, adjusted: ['r 7 → 0'], ignored: [] }),
-    'From the link: nothing set. Adjusted: r 7 → 0.');
-  assert.strictEqual(describePresets({ r: undefined, t: undefined, peak: undefined, adjusted: ['r 7 → 0'], ignored: ['peak=c (use A or B)'] }),
-    'From the link: nothing set. Adjusted: r 7 → 0. Ignored: peak=c (use A or B).');
+  assert.strictEqual(describePresets({ r: undefined, t: undefined, peak: undefined, adjusted: ['r 7\u00a0N/m → 0\u00a0N/m'], ignored: [] }),
+    'From the link: nothing set. Adjusted: r 7\u00a0N/m → 0\u00a0N/m.');
+  assert.strictEqual(describePresets({ r: undefined, t: undefined, peak: undefined, adjusted: ['r 7\u00a0N/m → 0\u00a0N/m'], ignored: ['peak=c (use A or B)'] }),
+    'From the link: nothing set. Adjusted: r 7\u00a0N/m → 0\u00a0N/m. Ignored: peak=c (use A or B).');
   assert.strictEqual(describePresets(parsePresets('?r=7&t=-190&peak=B&q=c&peak=c')),
-    'From the link: r = 0 N/m, t = −190 N/m, peak at B. Adjusted: r 7 → 0.');
-  assert.strictEqual(describePresets({ r: 100, t: -190, peak: 'B', adjusted: ['r 7 → 0'], ignored: ['peak=c (use A or B)'] }),
-    'From the link: r = 100 N/m, t = −190 N/m, peak at B. Adjusted: r 7 → 0. Ignored: peak=c (use A or B).');
+    'From the link: r = 0\u00a0N/m, t = −190\u00a0N/m, peak at B. Adjusted: r 7\u00a0N/m → 0\u00a0N/m.');
+  assert.strictEqual(describePresets({ r: 100, t: -190, peak: 'B', adjusted: ['r 7\u00a0N/m → 0\u00a0N/m'], ignored: ['peak=c (use A or B)'] }),
+    'From the link: r = 100\u00a0N/m, t = −190\u00a0N/m, peak at B. Adjusted: r 7\u00a0N/m → 0\u00a0N/m. Ignored: peak=c (use A or B).');
 });
 
 // Mutation: the LAST duplicate wins.
@@ -115,7 +115,7 @@ test('-0 becomes 0, not -0', () => {
     }
   }
   const text = describePresets(parse(['r', '-0']));
-  assert.strictEqual(text, 'From the link: r = 0 N/m.');
+  assert.strictEqual(text, 'From the link: r = 0\u00a0N/m.');
 });
 
 // Mutation: the ambiguous pattern (\d+\.?\d*|\.\d+) backtracks quadratically.
@@ -147,10 +147,10 @@ test('41 emoji keep 40 whole ones', () => {
 test('limits: r=500 is adjusted to 200', () => {
   const p = parse(['r', '500']);
   assert.strictEqual(p.r, 200);
-  assert.deepStrictEqual(p.adjusted, ['r 500 → 200']);
+  assert.deepStrictEqual(p.adjusted, ['r 500\u00a0N/m → 200\u00a0N/m']);
   const q = parse(['t', '-500']);
   assert.strictEqual(q.t, -200);
-  assert.deepStrictEqual(q.adjusted, ['t −500 → −200']);
+  assert.deepStrictEqual(q.adjusted, ['t −500\u00a0N/m → −200\u00a0N/m']);
 });
 
 // The 20,000-digit case alone is too gentle: the ambiguous pattern needs ~180 ms for it on this
@@ -206,9 +206,9 @@ test('a long bad peak is cut like a long bad number', () => {
 });
 
 test('a preset of zero is described, for r and for t', () => {
-  assert.strictEqual(describePresets(parse(['r', '0'])), 'From the link: r = 0 N/m.');
-  assert.strictEqual(describePresets(parse(['t', '5'])), 'From the link: t = 0 N/m. Adjusted: t 5 → 0.');
-  assert.strictEqual(describePresets(parse(['r', '0'], ['t', '0'], ['peak', 'A'])), 'From the link: r = 0 N/m, t = 0 N/m, peak at A.');
+  assert.strictEqual(describePresets(parse(['r', '0'])), 'From the link: r = 0\u00a0N/m.');
+  assert.strictEqual(describePresets(parse(['t', '5'])), 'From the link: t = 0\u00a0N/m. Adjusted: t 5\u00a0N/m → 0\u00a0N/m.');
+  assert.strictEqual(describePresets(parse(['r', '0'], ['t', '0'], ['peak', 'A'])), 'From the link: r = 0\u00a0N/m, t = 0\u00a0N/m, peak at A.');
 });
 
 test('a link that sets nothing but has a bad value says so; one with no values says nothing', () => {
@@ -221,10 +221,10 @@ test('a link that sets nothing but has a bad value says so; one with no values s
 test('an unknown parameter is not reported anywhere', () => {
   const p = parsePresets('?foo=bar&r=50&zzz');
   assert.deepStrictEqual(p, { ...EMPTY, r: 50 });
-  assert.strictEqual(describePresets(p), 'From the link: r = 50 N/m.');
+  assert.strictEqual(describePresets(p), 'From the link: r = 50\u00a0N/m.');
 });
 
 test('the description lists r, then t, then peak', () => {
-  assert.strictEqual(describePresets(parsePresets('?peak=A&t=20&r=30')), 'From the link: r = 30 N/m, t = 20 N/m, peak at A.');
-  assert.deepStrictEqual(parsePresets('?t=7&r=7&peak=zz').adjusted, ['r 7 → 0', 't 7 → 0']);
+  assert.strictEqual(describePresets(parsePresets('?peak=A&t=20&r=30')), 'From the link: r = 30\u00a0N/m, t = 20\u00a0N/m, peak at A.');
+  assert.deepStrictEqual(parsePresets('?t=7&r=7&peak=zz').adjusted, ['r 7\u00a0N/m → 0\u00a0N/m', 't 7\u00a0N/m → 0\u00a0N/m']);
 });

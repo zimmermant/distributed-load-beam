@@ -2,6 +2,9 @@ import { BEAM_L } from './physics.js';
 
 export const MINUS = '−';
 
+// A number and its unit are never separated by a line break: the space between them is a no-break space.
+export const NBSP = '\u00a0';
+
 // The only way a number reaches the screen. Rounds here and nowhere else; a
 // null or non-finite value prints as a dash; and negative zero can never
 // appear, because String(-0) is "0" and Number("-0.00") is -0.
@@ -27,8 +30,8 @@ export function forceWords(F) {
   const mag = Math.abs(F);
   const dp = Number.isInteger(mag) ? 0 : 2;
   const text = fmt(mag, dp);
-  if (text === '0' || text === '—') return `${text} N`;
-  return `${text} N ${F > 0 ? 'down' : 'up'}`;
+  if (text === '0' || text === '—') return `${text}${NBSP}N`;
+  return `${text}${NBSP}N ${F > 0 ? 'down' : 'up'}`;
 }
 
 // Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
@@ -37,5 +40,5 @@ export function locWords(x) {
   // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
   const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
-  return `at x = ${fmtFixed(x)} m from A${word ? ` (${word})` : ''}`;
+  return `at x = ${fmtFixed(x)}${NBSP}m from A${word ? ` (${word})` : ''}`;
 }

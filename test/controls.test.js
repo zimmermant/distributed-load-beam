@@ -135,7 +135,7 @@ test('render: readouts, aria-valuetext, and the zero label class "on"', () => {
   controls.render(state.getState());
   assert.equal(parts.rReadout.textContent, '−190');
   assert.equal(parts.rSlider.value, '-190');
-  assert.equal(parts.rSlider.attrs['aria-valuetext'], '−190 N/m');
+  assert.equal(parts.rSlider.attrs['aria-valuetext'], '−190\u00a0N/m');
   state.setR(0);
   state.setT(100);
   controls.render(state.getState());

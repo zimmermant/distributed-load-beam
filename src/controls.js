@@ -1,4 +1,4 @@
-import { fmt } from './format.js';
+import { NBSP, fmt } from './format.js';
 
 // Pure: what the controls show for state s.
 export function controlsView(s) {
@@ -22,7 +22,7 @@ export function createControls(root, state, parts) {
   function showSlider(slider, readout, zeroLabel, text, value, zero) {
     // Move the thumb when the state's value differs from it: a snap, or the keyboard's jump past the zero zone.
     if (Number(slider.value) !== value) slider.value = String(value);
-    slider.setAttribute('aria-valuetext', `${text} N/m`);
+    slider.setAttribute('aria-valuetext', `${text}${NBSP}N/m`);
     controlsSetText(readout, text);
     if (zeroLabel) zeroLabel.classList.toggle('on', zero);
   }

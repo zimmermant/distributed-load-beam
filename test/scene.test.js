@@ -204,8 +204,8 @@ const byText = (svg) => Object.fromEntries(texts(svg).map(n => [n.textContent, n
 
 test('top text block: heading, rectangular, triangular on two lines, sign note, all at TOP.textX', () => {
   const t = byText(draw({ r: 100, t: 100, peak: 'B' }));
-  const rows = [['Actual load on AB', COLORS.ink, '700', -28], ['Rectangular: 100 N/m', COLORS.rect, '400', -6],
-    ['Triangular:', COLORS.tri, '400', 16], ['peak 100 N/m at B', COLORS.tri, '400', 38], ['(+ down, − up)', COLORS.ink, '400', 60]];
+  const rows = [['Actual load on AB', COLORS.ink, '700', -28], ['Rectangular: 100\u00a0N/m', COLORS.rect, '400', -6],
+    ['Triangular:', COLORS.tri, '400', 16], ['peak 100\u00a0N/m at B', COLORS.tri, '400', 38], ['(+ down, − up)', COLORS.ink, '400', 60]];
   for (const [str, fill, weight, dy] of rows) {
     assert.ok(t[str], `missing "${str}"`);
     assert.equal(num(t[str].attrs.x), TOP.textX, str);
@@ -215,12 +215,12 @@ test('top text block: heading, rectangular, triangular on two lines, sign note, 
   }
   assert.equal(t['(+ down, − up)'].attrs.opacity, '0.7');
   const a = byText(draw({ r: -200, t: -15, peak: 'A' }));
-  assert.ok(a['Rectangular: −200 N/m'] && a['Triangular:'] && a['peak −15 N/m at A']);
+  assert.ok(a['Rectangular: −200\u00a0N/m'] && a['Triangular:'] && a['peak −15\u00a0N/m at A']);
 });
 
 test('dimension texts sit under AB and BC, and BC is dimmed', () => {
   const t = byText(draw(STATES[0]));
-  const ab = t['AB = 2 m (loaded)'], bc = t['BC = 2 m (no load)'];
+  const ab = t['AB = 2\u00a0m (loaded)'], bc = t['BC = 2\u00a0m (no load)'];
   assert.ok(ab && bc);
   assert.equal(num(ab.attrs.x), (topX(0) + topX(LOADED_L)) / 2);
   assert.equal(num(bc.attrs.x), (topX(LOADED_L) + topX(BEAM_L)) / 2);
@@ -239,8 +239,8 @@ test('column texts: name, force and location at COLS.x[k] + the text pad on the 
   const svg = draw({ r: 100, t: 100, peak: 'B' });
   const got = columnTexts(svg).map(n => [n.textContent, num(n.attrs.x), num(n.attrs.y), n.attrs.fill, n.attrs['font-weight']]);
   const want = [];
-  [['Rectangular', '200 N down', 'at x = 1.00 m from A', COLORS.rect], ['Triangular', '100 N down', 'at x = 1.33 m from A', COLORS.tri],
-    ['Combined', '300 N down', 'at x = 1.11 m from A', COLORS.comb]].forEach(([a, b, c, color], k) => {
+  [['Rectangular', '200\u00a0N down', 'at x = 1.00\u00a0m from A', COLORS.rect], ['Triangular', '100\u00a0N down', 'at x = 1.33\u00a0m from A', COLORS.tri],
+    ['Combined', '300\u00a0N down', 'at x = 1.11\u00a0m from A', COLORS.comb]].forEach(([a, b, c, color], k) => {
     const x = COLS.x[k] + 8;
     want.push([a, x, COLS.textY[0], color, '700'], [b, x, COLS.textY[1], color, '700'], [c, x, COLS.textY[2], COLORS.ink, '400']);
   });
@@ -250,14 +250,14 @@ test('column texts: name, force and location at COLS.x[k] + the text pad on the 
 test('column texts: up forces, a zero part, a couple, and no load', () => {
   const third = (s) => columnTexts(draw(s)).filter(n => num(n.attrs.y) === COLS.textY[2]).map(n => n.textContent);
   const second = (s) => columnTexts(draw(s)).filter(n => num(n.attrs.y) === COLS.textY[1]).map(n => n.textContent);
-  assert.deepEqual(second({ r: -100, t: -50, peak: 'B' }), ['200 N up', '50 N up', '250 N up']);
-  assert.deepEqual(third({ r: 0, t: 100, peak: 'B' }), ['no load of this kind', 'at x = 1.33 m from A', 'at x = 1.33 m from A']);
-  assert.deepEqual(third({ r: 100, t: 0, peak: 'B' }), ['at x = 1.00 m from A', 'no load of this kind', 'at x = 1.00 m from A']);
-  assert.deepEqual(third({ r: 100, t: -200, peak: 'B' }), ['at x = 1.00 m from A', 'at x = 1.33 m from A', 'the parts cancel: no single force']);
-  assert.deepEqual(second({ r: 100, t: -200, peak: 'B' }), ['200 N down', '200 N up', '0 N']);
+  assert.deepEqual(second({ r: -100, t: -50, peak: 'B' }), ['200\u00a0N up', '50\u00a0N up', '250\u00a0N up']);
+  assert.deepEqual(third({ r: 0, t: 100, peak: 'B' }), ['no load of this kind', 'at x = 1.33\u00a0m from A', 'at x = 1.33\u00a0m from A']);
+  assert.deepEqual(third({ r: 100, t: 0, peak: 'B' }), ['at x = 1.00\u00a0m from A', 'no load of this kind', 'at x = 1.00\u00a0m from A']);
+  assert.deepEqual(third({ r: 100, t: -200, peak: 'B' }), ['at x = 1.00\u00a0m from A', 'at x = 1.33\u00a0m from A', 'the parts cancel: no single force']);
+  assert.deepEqual(second({ r: 100, t: -200, peak: 'B' }), ['200\u00a0N down', '200\u00a0N up', '0\u00a0N']);
   assert.deepEqual(third({ r: 0, t: 0, peak: 'A' }), ['no load of this kind', 'no load of this kind', 'no load']);
-  assert.deepEqual(second({ r: 0, t: 0, peak: 'A' }), ['0 N', '0 N', '0 N']);
-  assert.deepEqual(third({ r: 100, t: -190, peak: 'B' }).slice(2), ['at x = −5.33 m from A (off the beam)']);
+  assert.deepEqual(second({ r: 0, t: 0, peak: 'A' }), ['0\u00a0N', '0\u00a0N', '0\u00a0N']);
+  assert.deepEqual(third({ r: 100, t: -190, peak: 'B' }).slice(2), ['at x = −5.33\u00a0m from A (off the beam)']);
 });
 
 test('the columns are named Rectangular, Triangular and Combined', () => {
@@ -294,7 +294,7 @@ test('a combined force that acts at the wall gets its arrow, drawn at the wall e
     assert.equal(comb.length, 1);
     assert.equal(comb[0].x, colX(2, 0));
     const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2] + COLS.textPad);
-    assert.equal(third[0].textContent, 'at x = 0.00 m from A');
+    assert.equal(third[0].textContent, 'at x = 0.00\u00a0m from A');
   }
 });
 
@@ -308,7 +308,7 @@ test('a combined force just off the wall (x = 0.10 m) gets its arrow and plain t
   assert.ok(x > 0.09 && x < 0.11, `x ${x}`);
   assert.equal(comb[0].x, colX(2, x));
   const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2] + COLS.textPad);
-  assert.equal(third[0].textContent, 'at x = 0.10 m from A');
+  assert.equal(third[0].textContent, 'at x = 0.10\u00a0m from A');
 });
 
 test('no text in the figure says "wall" or "no arrow" for any slider state (full sweep, counted)', () => {
@@ -321,7 +321,7 @@ test('no text in the figure says "wall" or "no arrow" for any slider state (full
     for (const n of texts(draw(s))) assert.ok(!/wall|no arrow/i.test(n.textContent), `${r},${t},${peak}: "${n.textContent}"`);
   }
   assert.equal(states, 2 * 81 * 81);
-  assert.ok(wallStates >= 4, `only ${wallStates} states put the combined force within 0.12 m of the wall`);
+  assert.ok(wallStates >= 4, `only ${wallStates} states put the combined force within 0.12\u00a0m of the wall`);
 });
 
 // ---- dotted outlines of the load in the three columns ----------------------------------------

@@ -25,9 +25,9 @@ async function boot(search) {
 test('page load with no parameters: titled, drawn, defaults in the controls, link line hidden', async () => {
   const { els, texts } = await boot('');
   assert.equal(document.title, 'Distributed load on a beam');
-  assert.ok(texts().includes('Rectangular: 100 N/m'));
-  assert.ok(texts().includes('300 N down'));
-  assert.ok(els.calc.innerHTML.includes('F = w × L = 100 × 2 = <b>200 N</b>'), els.calc.innerHTML);
+  assert.ok(texts().includes('Rectangular: 100\u00a0N/m'));
+  assert.ok(texts().includes('300\u00a0N down'));
+  assert.ok(els.calc.innerHTML.includes('F = w × L = 100\u00a0N/m × 2\u00a0m = <b>200\u00a0N</b>'), els.calc.innerHTML);
   assert.equal(els['r-readout'].textContent, '100');
   assert.equal(els['t-readout'].textContent, '100');
   assert.equal(els['peak-b'].attrs['aria-pressed'], 'true');
@@ -41,11 +41,11 @@ test('page load with parameters: applied before the first draw, described in the
   assert.equal(els['r-readout'].textContent, '−190');
   assert.equal(els['t-readout'].textContent, '100', 'a rejected parameter leaves the default');
   assert.equal(els['peak-a'].attrs['aria-pressed'], 'true');
-  assert.ok(texts().includes('Rectangular: −190 N/m'));
-  assert.ok(texts().includes('peak 100 N/m at A'));
+  assert.ok(texts().includes('Rectangular: −190\u00a0N/m'));
+  assert.ok(texts().includes('peak 100\u00a0N/m at A'));
   assert.ok(els.calc.innerHTML.includes('the peak is at A'));
   assert.equal(els['from-link'].hidden, false);
-  assert.equal(els['from-link'].textContent, 'From the link: r = −190 N/m, peak at A. Ignored: t=abc (use a number of N/m).');
+  assert.equal(els['from-link'].textContent, 'From the link: r = −190\u00a0N/m, peak at A. Ignored: t=abc (use a number of N/m).');
   assert.equal(els['from-link'].innerHTML, '', 'the link text is never written as markup');
 });
 
@@ -59,7 +59,7 @@ test('page load: each parameter on its own is applied, the others keep their def
   assert.equal(b.els['r-readout'].textContent, '100');
   b = await boot('?r=7');
   assert.equal(b.els['r-readout'].textContent, '0');
-  assert.equal(b.els['from-link'].textContent, 'From the link: r = 0 N/m. Adjusted: r 7 → 0.');
+  assert.equal(b.els['from-link'].textContent, 'From the link: r = 0\u00a0N/m. Adjusted: r 7\u00a0N/m → 0\u00a0N/m.');
   b = await boot('?unknown=1');
   assert.equal(b.els['from-link'].hidden, true);
 });
@@ -70,14 +70,14 @@ test('moving a slider or pressing a peak button redraws the figure, the calculat
   els['r-slider'].fire('input');
   assert.equal(els['r-readout'].textContent, '−50');
   assert.equal(els['t-readout'].textContent, '100');
-  assert.ok(texts().includes('Rectangular: −50 N/m'), texts().join('|'));
-  assert.ok(els.calc.innerHTML.includes('(−50) × 2'), els.calc.innerHTML);
+  assert.ok(texts().includes('Rectangular: −50\u00a0N/m'), texts().join('|'));
+  assert.ok(els.calc.innerHTML.includes('(−50\u00a0N/m) × 2\u00a0m'), els.calc.innerHTML);
   els['t-slider'].value = '25';
   els['t-slider'].fire('input');
   assert.equal(els['t-readout'].textContent, '25');
-  assert.ok(texts().includes('peak 25 N/m at B'));
+  assert.ok(texts().includes('peak 25\u00a0N/m at B'));
   els['peak-a'].fire('click');
-  assert.ok(texts().includes('peak 25 N/m at A'));
+  assert.ok(texts().includes('peak 25\u00a0N/m at A'));
   assert.ok(els.calc.innerHTML.includes('the peak is at A'));
   assert.equal(els['peak-a'].attrs['aria-pressed'], 'true');
   assert.equal(els['peak-b'].attrs['aria-pressed'], 'false');

@@ -69,7 +69,13 @@ test('the figure and the controls are both in the page and the calculation panel
     assert.match(m[0], /aria-pressed="(true|false)"/);
   }
   assert.equal((template.match(/class="zero-label"/g) || []).length, 2);
-  assert.ok(template.includes('−200 (up)') && template.includes('+200 (down)'));
+  assert.equal((template.match(/<span>−200&nbsp;N\/m \(up\)<\/span>/g) || []).length, 2);
+  assert.equal((template.match(/<span>\+200&nbsp;N\/m \(down\)<\/span>/g) || []).length, 2);
+  assert.equal((template.match(/class="zero-label">0&nbsp;N\/m<\/span>/g) || []).length, 2);
+  assert.ok(template.includes('Which end comes to a point (w = 0&nbsp;N/m)?'));
+  assert.ok(template.includes('A 4&nbsp;m beam fixed to a wall at A'));
+  assert.ok(template.includes('(L = 2&nbsp;m)'));
+  assert.equal((template.match(/<\/b>&nbsp;N\/m</g) || []).length, 2, 'both readouts are followed by a no-break space and N/m');
 });
 
 test('app.js: the From the link line is written with textContent, never innerHTML', () => {
@@ -136,7 +142,9 @@ test('controls and calculation: stacked below 700 px, two columns at 700 px and 
   assert.match(css, /\.side \{[^}]*max-width: 740px;[^}]*margin: 6px auto 0;/);
   const m = mediaBlocks.find(b => b.width === 700);
   assert.ok(m, 'a 700 px breakpoint');
-  assert.match(m.body, /\.side \{[^}]*grid-template-columns: 1\.25fr 1fr;/);
+  assert.match(m.body, /\.side \{[^}]*grid-template-columns: 1\.1fr 1fr;/);
+  // the controls column must keep the ~350 px of content two peak buttons need (panel padding + border: 26 px), on a 740 px row with an 8 px gap
+  assert.ok((740 - 8) * 1.1 / 2.1 >= 350 + 26, 'the controls column is too narrow for the peak buttons');
   assert.match(m.body, /position: sticky; bottom: 0;/);
   assert.match(m.body, /background: #ffffff;/);                              // opaque, so the figure does not show through
   assert.match(m.body, /border-top: 1px solid/);
@@ -146,4 +154,14 @@ test('controls and calculation: stacked below 700 px, two columns at 700 px and 
 test('the From the link line starts hidden and empty, and is a plain paragraph', () => {
   assert.match(template, /<p id="from-link" hidden><\/p>/);
   assert.match(css, /#from-link\[hidden\] \{ display: none; \}/);
+});
+
+test('the calculation text is compact enough for its tallest state: 13 px text, line height 1.3, tight vertical padding, 4 px between lines', () => {
+  const calc = cssBare.match(/#calc \{([^}]*)\}/);
+  assert.ok(calc, 'no #calc rule');
+  assert.match(calc[1], /font-size: 13px;/, 'the calculation text must stay at least 12 px (13 px here)');
+  assert.match(calc[1], /line-height: 1\.3;/);
+  assert.match(cssBare, /#calc \.cl \{ margin-bottom: 4px; \}/);
+  assert.match(cssBare, /\.calc-panel \{ padding-top: 4px; padding-bottom: 4px; \}/);
+  assert.match(cssBare, /\.calc-panel h2 \{ margin-bottom: 2px; \}/);
 });

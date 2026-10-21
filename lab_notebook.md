@@ -1,5 +1,60 @@
 # Lab Notebook
 
+## 2026-10-21 - Merged: units on every number
+
+### Summary
+`feat/units-everywhere` was merged into `main` with `--no-ff` (merge commit 57fb527) at Todd's request ("yes", to merge and republish); `main` had not moved since the fork (e2ab28b), so the merge was clean. Every number on the page now carries its unit (calculation panel including formulas and sums, slider scales, aria text, link notes), a no-break space joins each number to its unit, and a lint test scans all page text for every state.
+
+### Decisions made
+- Local merge, `--no-ff`; the branch was deleted afterwards.
+- Re-verified on the merged tree: 193 of 193 tests pass; `node build.js` reproduces the committed `dist/distributed_load_beam.html` byte-for-byte (42,156 bytes); tree clean. Before the merge the harness was clean at 800x750, 1280x720 and 1000x700, the worst-case probes fit, an independent scan of the rendered text found no number without a unit, and the full mutation audit caught all 409 rows with every test covered.
+- Republished with the same guarded method as before (a new commit on top of the public history).
+
+### Problems encountered
+None during the merge.
+
+### Open questions / next steps
+- Not yet tried inside a real Canvas iframe.
+- Sources: `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`, `docs/superpowers/sdd-ledger-distributed-load-beam.md`.
+
+## 2026-10-21 - Every number on the page carries its unit (branch feat/units-everywhere)
+
+### Summary
+Todd: "All numbers should include units (always!)". The calculation now reads `F = w × L = 100 N/m × 2 m = 200 N`, `F = ½ × peak × L = ½ × 100 N/m × 2 m = 100 N`, `F = 200 N + (100 N) = 300 N, at x̄ = (200 N × 1.00 m + 100 N × 1.33 m) / 300 N = 1.11 m` (negative terms `(−190 N)`, `(−190 N/m)`; the zero notes `w = 0 N/m`, `peak = 0 N/m`). Slider scales read `−200 N/m (up)`, `0 N/m`, `+200 N/m (down)`; the peak question says `(w = 0 N/m)`; the figure's aria-label says `4 m`; the link note prints units on both sides of the arrow (`r 500 N/m → 200 N/m`). The figure's own texts already had units. New `test/units.test.js` (the unit lint) builds the page's text for all 13,122 slider states (figure and calculation), every control readout and aria-valuetext, the template's static text and a table of 25 link URLs, and fails on any number without N/m, N or m. It was written first and failed on the old code (142,004 bare numbers in the calculation, 8 in the template, 41 in the link notes). The rule lives in `test/unit-rule.js` so `tools/mutations.mjs` can mutate it too. Totals now: 193 tests, 409 mutation rows, all caught, every test covered (`docs/superpowers/mutation-coverage-run.txt`).
+
+### Decisions made
+- The fraction ½ is the only number exempt (dimensionless); the lint also fails on any other non-ASCII numeric character. The user's literal echo in the link note (`r=abc (use a number of N/m)`) stays literal and is blanked before linting.
+- Fix round 1 (controller saw `= 1.11` / `m` split across lines in the browser): the space between a number and its unit is U+00A0 everywhere (calculation, scale labels via `&nbsp;`, heading, readout sentence, link note, aria text, and the figure's SVG texts: no wrap there, but the same width as a space, so measurements are unchanged, and it copies and is read as one unit). The lint accepts only U+00A0 and fails a plain space before a unit (separate list, every source), with mutation rows for each.
+- Fix round 2 (controller measured the cancelling state, couple note, 233 px tall vs controls 203 px: the sticky row covered ~6 px of the figure at 1000x700 and the page was 17 px too tall at 800x750): CSS only: controls/calculation row `1.25fr 1fr` to `1.1fr 1fr` (controls column stays >= 376 px: the ~350 px of content the two peak buttons need plus 26 px of panel padding and border), `#calc` line-height 1.4 to 1.3, 4 px between lines (was 5), calculation panel vertical padding 4 px and heading margin 2 px. Text stays 13 px. The implementer estimated about 212 px for the cancelling state; the controller then MEASURED it in a real browser: the calculation panel is 181 px tall (controls panel 203 px), so the sticky row is 203 px at every probe state; at 800x750 and 1280x720 the page height equals the window for all probe states (cancel, off-the-beam, near-wall, extremes, preset notes); at 1000x700 only the cancelling state overshoots, by 9 px, with the controls still pinned; the sticky row never covers drawn content; the figure stays 740 px wide. The knobs are those four values (pinned by a template test and mutation rows).
+- `fmt` prints a pasted 1e60 as `1e+60` (Number.toFixed beyond 1e21); unchanged, and the lint reads the exponent as part of its number.
+
+### Problems encountered
+- The first lint run passed on the old code: a prefix bug in the verdict filter (`calc:` versus `calc {`). Found by checking that the RED output actually appeared; fixed.
+- The mutation "render does not clear the figure" made the lint's figure loop quadratic (a 9-minute hang): the lint now draws a fresh figure per state.
+- `svg.js` `text` not setting its content now fails 13 tests (limit 12): given its own limit, `{ max: 13 }`.
+- The lint's own rule tests could not be failed by any `src/` mutation (the coverage check listed them); the rule moved to `test/unit-rule.js` and the runner accepts rows for that file.
+
+### Open questions / next steps
+- The controller's browser probes (800x750, 1280x720, 1000x700; the six probe URLs) decide whether the calculation compaction is enough.
+- Not merged or republished; the public copy still has the old text.
+
+Sources: README.md ("Every number on the page carries its unit"), `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md` ("The calculation"), `test/units.test.js`, `test/unit-rule.js`, `tools/mutations.mjs`, `docs/superpowers/mutation-audit-report.md`, `docs/superpowers/mutation-coverage-run.txt`.
+
+## 2026-10-21 - Republished: framed cards live (public commit 3f5c267)
+
+### Summary
+The merged build (bb954e8 here) is live at https://zimmermant.github.io/distributed-load-beam/ as public commit 3f5c267, a normal fast-forward push (0ae6e00..3f5c267) on top of the existing public history, using the method recorded in the previous republish entry. The live `dist/distributed_load_beam.html` is byte-identical to the local build. On the live page (800x750) the three cards are present, the harness is clean (176 combinations, 0 violations, text 12.3 px, all probes incl. the card probe caught, budget ok) and the preset link renders.
+
+### Decisions made
+- Same guarded method as before; pre-push checks on the public clone: 184 of 184 tests pass, its build is reproducible and identical to this repo's dist, only the 9 expected files changed, zero local-path or secret-like hits in the diff or tree, no `docs/` or tooling folders public.
+- This entry reaches the public copy with the next update.
+
+### Problems encountered
+None.
+
+### Open questions / next steps
+- Not yet tried inside a real Canvas iframe.
+
 ## 2026-10-21 - Merged: framed card per equivalent-force column
 
 ### Summary

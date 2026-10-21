@@ -1,5 +1,5 @@
 import { snapW } from './physics.js';
-import { fmt } from './format.js';
+import { NBSP, fmt } from './format.js';
 
 // Optional URL parameters that preset a problem:
 //   r=N/m  rectangular load    t=N/m  triangular peak load    peak=A|B  where the triangle peaks
@@ -36,7 +36,7 @@ function presetLoad(name, raw, out) {
   }
   const s = snapW(n);                              // never -0
   // Compare what would be PRINTED: a snap too small to show (100.0001 to 100) is no news.
-  if (fmt(n) !== fmt(s)) out.adjusted.push(`${name} ${fmt(n)} → ${fmt(s)}`);
+  if (fmt(n) !== fmt(s)) out.adjusted.push(`${name} ${fmt(n)}${NBSP}N/m → ${fmt(s)}${NBSP}N/m`);
   return s;
 }
 
@@ -62,8 +62,8 @@ export function parsePresets(search) {
 
 export function describePresets(p) {
   const set = [];
-  if (p.r !== undefined) set.push(`r = ${fmt(p.r)} N/m`);
-  if (p.t !== undefined) set.push(`t = ${fmt(p.t)} N/m`);
+  if (p.r !== undefined) set.push(`r = ${fmt(p.r)}${NBSP}N/m`);
+  if (p.t !== undefined) set.push(`t = ${fmt(p.t)}${NBSP}N/m`);
   if (p.peak !== undefined) set.push(`peak at ${p.peak}`);
   const parts = [];
   if (set.length) parts.push(`From the link: ${set.join(', ')}.`);

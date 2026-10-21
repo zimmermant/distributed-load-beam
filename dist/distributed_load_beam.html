@@ -32,7 +32,7 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
 .panel { border: 1px solid #d5dbe3; border-radius: 8px; padding: 6px 12px; background: #f9fafb; }
 @media (min-width: 700px) {
   .side {
-    grid-template-columns: 1.25fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
+    grid-template-columns: 1.1fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
     position: sticky; bottom: 0; z-index: 2; background: #ffffff; border-top: 1px solid #d5dbe3; box-shadow: 0 -4px 6px -4px #0003;
   }
 }
@@ -99,8 +99,14 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
 .peak-btn.sel:active { background: #c6f6d5; }
 
 /* ---- the calculation ------------------------------------------------ */
-#calc { font-size: 13px; line-height: 1.4; }
-#calc .cl { margin-bottom: 5px; }
+/* Units make the lines longer; the tallest state (the cancelling one, with the couple note) must be no taller
+   than the controls panel, or the sticky row grows and covers the figure. So the calculation gets a little
+   more width (the 1.1fr 1fr row above; the controls column still offers >= 376 px, the 350 px of content two
+   peak buttons need), a slightly tighter line height and tighter vertical padding. Text stays 13 px. */
+.calc-panel { padding-top: 4px; padding-bottom: 4px; }
+.calc-panel h2 { margin-bottom: 2px; }
+#calc { font-size: 13px; line-height: 1.3; }
+#calc .cl { margin-bottom: 4px; }
 #calc .cl:last-child { margin-bottom: 0; }
 #calc .note { font-style: italic; color: #4a5568; }
 #calc .rnd { color: #4a5568; }
@@ -112,28 +118,28 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
 <h1>Distributed load on a beam</h1>
 <p id="from-link" hidden></p>
 <div class="fig-col">
-<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4 metre beam fixed to a wall at A, with a distributed load on the half AB, and below it the equivalent force of each part and of the two combined"></svg>
+<svg id="fig" viewBox="0 0 960 560" role="img" aria-label="A 4&nbsp;m beam fixed to a wall at A, with a distributed load on the half AB, and below it the equivalent force of each part and of the two combined"></svg>
 </div>
 <div class="side">
 <section id="controls" class="panel" aria-label="Load controls">
   <div class="ctl">
-    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b> N/m</div>
+    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b>&nbsp;N/m</div>
     <div class="zs">
       <i class="zt"></i>
       <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
-      <div class="zl"><span>−200 (up)</span><span id="r-zero" class="zero-label">0</span><span>+200 (down)</span></div>
+      <div class="zl"><span>−200&nbsp;N/m (up)</span><span id="r-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (down)</span></div>
     </div>
   </div>
   <div class="ctl">
-    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b> N/m</div>
+    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b>&nbsp;N/m</div>
     <div class="zs">
       <i class="zt"></i>
       <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
-      <div class="zl"><span>−200 (up)</span><span id="t-zero" class="zero-label">0</span><span>+200 (down)</span></div>
+      <div class="zl"><span>−200&nbsp;N/m (up)</span><span id="t-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (down)</span></div>
     </div>
   </div>
   <div class="peak">
-    <div id="peak-label" class="peak-q">Which end comes to a point (w = 0)?</div>
+    <div id="peak-label" class="peak-q">Which end comes to a point (w = 0&nbsp;N/m)?</div>
     <div class="peak-row" role="group" aria-labelledby="peak-label">
       <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A, peak at B</span></button>
       <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A</span></button>
@@ -141,7 +147,7 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
   </div>
 </section>
 <section class="panel calc-panel">
-  <h2>How each force is calculated (L = 2 m)</h2>
+  <h2>How each force is calculated (L = 2&nbsp;m)</h2>
   <div id="calc" aria-live="polite"></div>
 </section>
 </div>
@@ -208,6 +214,9 @@ function equivalents(s) {
 
 const MINUS = '−';
 
+// A number and its unit are never separated by a line break: the space between them is a no-break space.
+const NBSP = '\u00a0';
+
 // The only way a number reaches the screen. Rounds here and nowhere else; a
 // null or non-finite value prints as a dash; and negative zero can never
 // appear, because String(-0) is "0" and Number("-0.00") is -0.
@@ -233,8 +242,8 @@ function forceWords(F) {
   const mag = Math.abs(F);
   const dp = Number.isInteger(mag) ? 0 : 2;
   const text = fmt(mag, dp);
-  if (text === '0' || text === '—') return `${text} N`;
-  return `${text} N ${F > 0 ? 'down' : 'up'}`;
+  if (text === '0' || text === '—') return `${text}${NBSP}N`;
+  return `${text}${NBSP}N ${F > 0 ? 'down' : 'up'}`;
 }
 
 // Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
@@ -243,7 +252,7 @@ function locWords(x) {
   // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
   const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
-  return `at x = ${fmtFixed(x)} m from A${word ? ` (${word})` : ''}`;
+  return `at x = ${fmtFixed(x)}${NBSP}m from A${word ? ` (${word})` : ''}`;
 }
 
 // ===== svg.js =====
@@ -375,7 +384,7 @@ function presetLoad(name, raw, out) {
   }
   const s = snapW(n);                              // never -0
   // Compare what would be PRINTED: a snap too small to show (100.0001 to 100) is no news.
-  if (fmt(n) !== fmt(s)) out.adjusted.push(`${name} ${fmt(n)} → ${fmt(s)}`);
+  if (fmt(n) !== fmt(s)) out.adjusted.push(`${name} ${fmt(n)}${NBSP}N/m → ${fmt(s)}${NBSP}N/m`);
   return s;
 }
 
@@ -401,8 +410,8 @@ function parsePresets(search) {
 
 function describePresets(p) {
   const set = [];
-  if (p.r !== undefined) set.push(`r = ${fmt(p.r)} N/m`);
-  if (p.t !== undefined) set.push(`t = ${fmt(p.t)} N/m`);
+  if (p.r !== undefined) set.push(`r = ${fmt(p.r)}${NBSP}N/m`);
+  if (p.t !== undefined) set.push(`t = ${fmt(p.t)}${NBSP}N/m`);
   if (p.peak !== undefined) set.push(`peak at ${p.peak}`);
   const parts = [];
   if (set.length) parts.push(`From the link: ${set.join(', ')}.`);
@@ -610,8 +619,8 @@ function sceneBeam(parent, x0, y, px) {
 function sceneTopLines(s) {
   const lines = [['Actual load on AB', COLORS.ink, true]];
   const entries = [
-    [`Rectangular: ${fmt(s.r, 0)} N/m`, COLORS.rect],
-    [`Triangular: peak ${fmt(s.t, 0)} N/m at ${s.peak}`, COLORS.tri]
+    [`Rectangular: ${fmt(s.r, 0)}${NBSP}N/m`, COLORS.rect],
+    [`Triangular: peak ${fmt(s.t, 0)}${NBSP}N/m at ${s.peak}`, COLORS.tri]
   ];
   for (const [str, color] of entries) {
     if (str.length <= SCENE_LINE_MAX) { lines.push([str, color, false]); continue; }
@@ -631,7 +640,7 @@ function sceneColumnLines(name, part, d) {
   } else {
     third = locWords(part.x);
   }
-  return [name, F === 0 ? '0 N' : forceWords(F), third];
+  return [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
 }
 
 function sceneTop(svg, s) {
@@ -662,8 +671,8 @@ function sceneTop(svg, s) {
   el('line', { x1: xB, y1: y - tick, x2: xB, y2: y + tick, stroke: COLORS.outline }, g);
   el('line', { x1: xB, y1: y, x2: xC, y2: y, stroke: COLORS.beam, 'stroke-dasharray': '4 3' }, g);
   el('line', { x1: xC, y1: y - tick, x2: xC, y2: y + tick, stroke: COLORS.beam }, g);
-  sceneText(svg, (xA + xB) / 2, TOP.dimTextY, 'AB = 2 m (loaded)', { anchor: 'middle' });
-  sceneText(svg, (xB + xC) / 2, TOP.dimTextY, 'BC = 2 m (no load)', { anchor: 'middle' }).setAttribute('opacity', 0.6);
+  sceneText(svg, (xA + xB) / 2, TOP.dimTextY, `AB = 2${NBSP}m (loaded)`, { anchor: 'middle' });
+  sceneText(svg, (xB + xC) / 2, TOP.dimTextY, `BC = 2${NBSP}m (no load)`, { anchor: 'middle' }).setAttribute('opacity', 0.6);
 
   // heading, rectangular, triangular (one or two lines), then the sign note
   const dy = [-28, -6, 16, 38, 60];
@@ -740,25 +749,29 @@ function createScene(svg) {
 // string, so no URL text can reach this HTML.
 const PANEL_XBAR = 'x̄';
 
-// A negative number inside a sum or product is written in parentheses.
-function panelPar(n) {
+// Every number is followed by its unit (N, N/m or m), also inside a formula. A negative number
+// inside a sum or product is written in parentheses, unit inside: (−190 N/m).
+const PANEL_N = 'N';
+const PANEL_NPM = 'N/m';
+const PANEL_M = 'm';
+function panelPar(n, unit) {
   const text = fmt(n);
-  return text.startsWith(MINUS) ? `(${text})` : text;
+  return text.startsWith(MINUS) ? `(${text}${NBSP}${unit})` : `${text}${NBSP}${unit}`;
 }
 
 function panelRect(d, s) {
   const name = '<span class="c-rect"><b>Rectangle</b></span>';
-  if (d.rect.F === 0) return `${name}: w = 0, so there is no rectangular load and no force from it.`;
-  return `${name} (constant w): F = w × L = ${panelPar(s.r)} × ${fmt(LOADED_L)} = <b>${fmt(d.rect.F)} N</b>, ` +
-    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)} m`;
+  if (d.rect.F === 0) return `${name}: w = 0${NBSP}${PANEL_NPM}, so there is no rectangular load and no force from it.`;
+  return `${name} (constant w): F = w × L = ${panelPar(s.r, PANEL_NPM)} × ${fmt(LOADED_L)}${NBSP}${PANEL_M} = <b>${fmt(d.rect.F)}${NBSP}${PANEL_N}</b>, ` +
+    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)}${NBSP}${PANEL_M}`;
 }
 
 function panelTri(d, s) {
   const peak = s.peak === 'A' ? 'A' : 'B';          // never raw text into innerHTML
   const name = '<span class="c-tri"><b>Triangle</b></span>';
-  if (d.tri.F === 0) return `${name}: peak = 0, so there is no triangular load and no force from it.`;
-  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t)} × ${fmt(LOADED_L)} = <b>${fmt(d.tri.F)} N</b>, ` +
-    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)} m`;
+  if (d.tri.F === 0) return `${name}: peak = 0${NBSP}${PANEL_NPM}, so there is no triangular load and no force from it.`;
+  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t, PANEL_NPM)} × ${fmt(LOADED_L)}${NBSP}${PANEL_M} = <b>${fmt(d.tri.F)}${NBSP}${PANEL_N}</b>, ` +
+    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)}${NBSP}${PANEL_M}`;
 }
 
 // A word when the combined force acts off the beam (judged on the printed value).
@@ -777,17 +790,17 @@ function panelNeedsExact(d) {
 
 function panelComb(d) {
   const name = '<span class="c-comb"><b>Combined</b></span>';
-  const sum = `F = ${panelPar(d.rect.F)} + (${fmt(d.tri.F)}) = <b>${fmt(d.comb.F)} N</b>`;
+  const sum = `F = ${panelPar(d.rect.F, PANEL_N)} + (${fmt(d.tri.F)}${NBSP}${PANEL_N}) = <b>${fmt(d.comb.F)}${NBSP}${PANEL_N}</b>`;
   if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so there is no combined force.`;
   if (d.comb.F === 0) return `${name}: ${sum}: the two parts cancel, so no single force replaces them.`;
   if (d.rect.F === 0 || d.tri.F === 0) {
     const only = d.rect.F === 0 ? 'triangle' : 'rectangle';
-    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)} m</b> ` +
+    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)}${NBSP}${PANEL_M}</b> ` +
       `(only the ${only} acts, so its location is the combined one)${panelWhere(d.comb.x)}`;
   }
-  const num = `${panelPar(d.rect.F)} × ${fmtFixed(d.rect.x)} + ${panelPar(d.tri.F)} × ${fmtFixed(d.tri.x)}`;
+  const num = `${panelPar(d.rect.F, PANEL_N)} × ${fmtFixed(d.rect.x)}${NBSP}${PANEL_M} + ${panelPar(d.tri.F, PANEL_N)} × ${fmtFixed(d.tri.x)}${NBSP}${PANEL_M}`;
   const exact = panelNeedsExact(d) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
-  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F)} = <b>${fmtFixed(d.comb.x)} m</b>` +
+  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F, PANEL_N)} = <b>${fmtFixed(d.comb.x)}${NBSP}${PANEL_M}</b>` +
     `${panelWhere(d.comb.x)}${exact}`;
 }
 
@@ -847,7 +860,7 @@ function createControls(root, state, parts) {
   function showSlider(slider, readout, zeroLabel, text, value, zero) {
     // Move the thumb when the state's value differs from it: a snap, or the keyboard's jump past the zero zone.
     if (Number(slider.value) !== value) slider.value = String(value);
-    slider.setAttribute('aria-valuetext', `${text} N/m`);
+    slider.setAttribute('aria-valuetext', `${text}${NBSP}N/m`);
     controlsSetText(readout, text);
     if (zeroLabel) zeroLabel.classList.toggle('on', zero);
   }

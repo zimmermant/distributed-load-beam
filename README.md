@@ -16,17 +16,19 @@ A is at x = 0 (the wall), B at x = 2 m, C at x = 4 m, with x measured from A. On
 
 | Control | What it does |
 |---|---|
-| **Rectangular load** slider | w, constant along AB, from −200 to +200 N/m in steps of 5. |
+| **Rectangular load** slider | w, constant along AB, from −200 N/m to +200 N/m in steps of 5 N/m; the scale under the slider reads `−200 N/m (up)`, `0 N/m`, `+200 N/m (down)`. |
 | **Triangular load** slider | The triangle's peak value, same range and step. The triangle is that value at one end of AB and 0 at the other. |
 | **zero at A, peak at B** / **zero at B, peak at A** | Which end the triangle comes to a point (w = 0). A is the wall. Exactly one button is pressed. |
 
 Details that are easy to miss:
 
-- **Snap to zero.** A slider value within ±10 N/m of zero becomes exactly 0, so the first non-zero values are ±15. A green tick marks the centre of each scale and its "0" label lights up while the value is 0.
+- **Snap to zero.** A slider value within ±10 N/m of zero becomes exactly 0, so the first non-zero values are ±15. A green tick marks the centre of each scale and its "0 N/m" label lights up while the value is 0.
 - **Keyboard nudge.** One arrow-key step (5) is smaller than the snap zone, so a slider sitting at 0 could never leave it. From 0, an arrow key jumps straight to +15 or −15. From ±15 the next key toward zero lands on 0. A pointer drag just snaps.
 - Every control visibly responds to hover, press, keyboard focus and selection.
 
 The defaults are r = 100 N/m, t = 100 N/m, peak at B.
+
+**Every number on the page carries its unit** (N, N/m or m), also inside the calculation: `F = w × L = 100 N/m × 2 m = 200 N`; `F = 200 N + (100 N) = 300 N, at x̄ = (200 N × 1.00 m + 100 N × 1.33 m) / 300 N = 1.11 m`. A negative term keeps its parentheses with the unit inside, `(−190 N)`. The space between a number and its unit is a no-break space (U+00A0), so a line break never separates them. The fraction ½ is a pure number and has no unit. `test/units.test.js` (the unit lint) builds the page's text for every slider state, every link note and the page's static text, and fails on any number without a unit or with a plain space in front of one.
 
 ## The equivalent forces
 
@@ -68,7 +70,7 @@ Add optional query parameters to the page's address to start from a chosen setup
 
 Numbers are plain decimals (`-150`, `+5`, `.5`, `1.`; no exponent, no hex, not empty). The page prints negative numbers with a real minus sign (−), and a number copied from the screen with that sign (a leading U+2212) is accepted too. A value that does not parse is ignored, as if absent. If a parameter is repeated, the **first one wins**. **Unknown parameters are ignored.**
 
-Values are **snapped exactly as the sliders would snap them**: clamped to ±200, rounded to a multiple of 5, and anything within ±10 of zero becomes 0. A "From the link" line under the title says what was set, what snapping changed (for example `r 500 → 200`) and what was ignored (a rejected value is echoed back, cut at 40 characters). For example `?r=500&t=3&peak=Q` shows: `From the link: r = 200 N/m, t = 0 N/m. Adjusted: r 500 → 200; t 3 → 0. Ignored: peak=Q (use A or B).` The line is written as text only, so nothing in the link can become markup.
+Values are **snapped exactly as the sliders would snap them**: clamped to ±200, rounded to a multiple of 5, and anything within ±10 of zero becomes 0. A "From the link" line under the title says what was set, what snapping changed (for example `r 500 N/m → 200 N/m`) and what was ignored (a rejected value is echoed back, cut at 40 characters). For example `?r=500&t=3&peak=Q` shows: `From the link: r = 200 N/m, t = 0 N/m. Adjusted: r 500 N/m → 200 N/m; t 3 N/m → 0 N/m. Ignored: peak=Q (use A or B).` The line is written as text only, so nothing in the link can become markup.
 
 Presets apply **once, at load**. **Nothing is locked**: students can still move every control, and reloading the link restores the setup.
 
@@ -148,5 +150,5 @@ A pass means every phase is clean: `install` finds the figure at least 600 px wi
 - **Fixed force scale.** Arrow length is `fs × |F|`, with no per-state rescaling.
 - **Class contracts the browser harness relies on.** Every graphic drawn by `scene.js` carries class `g` (the wall and its hatching also `wall`; the A, B, C circles also `pc`; the dotted load outlines also `outline`); the three column cards and their heading bands carry class `card` and deliberately not `g`, so the harness's text-versus-graphic checks ignore them and its containment check finds them; every text carries class `t` (letters inside the circles: `tin`); every SVG text is at least 16 units. Remove a class and the harness stops seeing that element.
 - **Tests that scan HTML strip the tags first** (the markup carries `style` attributes with hyphens before digits), then look for `-0`, `NaN`, `Infinity` and a hyphen-minus before a digit.
-- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (354 rows; every row caught; all 184 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
+- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (409 rows; every row caught; all 193 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
 - **Link text never becomes markup.** The calculation is built only from numbers formatted by `fmt` / `fmtFixed` and fixed strings; the "From the link" line is set with `textContent`.
