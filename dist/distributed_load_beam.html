@@ -19,13 +19,13 @@ h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 600; }
 h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
 
 /* ---- page layout -------------------------------------------------------
-   below 700 px: everything stacked
-   700 px and up: the figure, then controls and calculation side by side (that row sticks to
-     the bottom of the window, so the controls stay in view while the figure scrolls)
-   1150 px and up: figure on the left, controls over calculation in a 340 px right column.
-     The figure must stay >= 740 px wide there (text >= 12 px): 740 + 20 gap + 340 column
-     + 32 body padding = 1132, plus up to 15 for a scrollbar = 1147, so the breakpoint is 1150. */
-.page { max-width: 1100px; margin: 0 auto; }
+   One column at every width, at most 740 px wide and centred when the window is wider (.page holds
+   the title, the link note, the figure and the controls row, so their left edges line up):
+   title, link note, the figure, then the controls and the calculation. Below 700 px those two are stacked.
+   From 700 px up they sit side by side in a row that sticks to the bottom of the window, so the
+   controls stay in view while the figure scrolls. There is no wide-window column layout: the
+   figure stays 740 px wide wherever the window is at least 800 px wide (text >= 12 px). */
+.page { max-width: 740px; margin: 0 auto; }
 .fig-col { max-width: 740px; margin: 0 auto; }
 #fig { display: block; width: 100%; height: auto; }
 .side { max-width: 740px; margin: 6px auto 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -35,12 +35,6 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
     grid-template-columns: 1.25fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
     position: sticky; bottom: 0; z-index: 2; background: #ffffff; border-top: 1px solid #d5dbe3; box-shadow: 0 -4px 6px -4px #0003;
   }
-}
-@media (min-width: 1150px) {
-  .page { display: grid; grid-template-columns: minmax(0, 740px) 340px; column-gap: 20px; align-items: start; justify-content: center; }
-  .page > h1, .page > #from-link { grid-column: 1 / -1; }
-  .fig-col { grid-column: 1; margin: 0; }
-  .side { grid-column: 2; grid-template-columns: 1fr; max-width: none; padding: 0; position: static; border-top: 0; box-shadow: none; }
 }
 
 /* ---- the "From the link" note: one small unboxed line under the title ---- */
@@ -161,7 +155,6 @@ const LOADED_L = 2;          // m, the loaded half AB
 const W_MAX = 200;           // N/m, slider range is -W_MAX..+W_MAX
 const W_STEP = 5;            // N/m
 const W_SNAP = 10;           // N/m, |w| <= W_SNAP snaps to 0
-const WALL_CLEAR_M = 0.12;   // m, a force arrow closer to the wall than this is not drawn (its head would overlap the wall)
 
 // Slider value -> allowed value: clamp, round to W_STEP, snap the zero zone to 0.
 // Non-finite input becomes 0, and the result is never -0.
@@ -244,23 +237,12 @@ function forceWords(F) {
   return `${text} N ${F > 0 ? 'down' : 'up'}`;
 }
 
-// '' away from the wall; 'at the wall' or 'near the wall' for a location that gets no arrow
-// (x < WALL_CLEAR_M, the rule of layout.js forceArrow). Judged on the PRINTED value: a location
-// that prints 0.00 is "at" the wall, one that prints 0.01..0.12 is "near" it, and one that prints
-// below 0 is off the beam instead (that note is locWords's and panelWhere's).
-function wallWord(x) {
-  if (x === null || x === undefined || !(x < WALL_CLEAR_M)) return '';
-  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  if (shown < 0) return '';
-  return shown === 0 ? 'at the wall' : 'near the wall';
-}
-
-// Location in words; '' when there is none (x null). Flags a point beyond the beam, or at or near the wall.
+// Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
 function locWords(x) {
   if (x === null || x === undefined) return '';
   // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : wallWord(x);
+  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
   return `at x = ${fmtFixed(x)} m from A${word ? ` (${word})` : ''}`;
 }
 
@@ -501,10 +483,10 @@ function loadShapes(s) {
 }
 
 // Equivalent force F (signed, + down) at x metres from A in column k, or null
-// when there is nothing to draw (no force, no location, off the beam, or closer to the wall than
-// WALL_CLEAR_M: the head would overlap the wall, so the text carries that location instead).
+// when there is nothing to draw (no force, no location, or a location off the beam). At x = 0
+// the head partly overlaps the wall rectangle: accepted, not a defect.
 function forceArrow(k, F, x) {
-  if (F === 0 || x === null || x === undefined || x < WALL_CLEAR_M || x > BEAM_L) return null;
+  if (F === 0 || x === null || x === undefined || x < 0 || x > BEAM_L) return null;
   return layoutArrow(colX(k, x), F, COLS.fs * Math.abs(F), COLS.beamY);
 }
 
@@ -747,14 +729,11 @@ function panelTri(d, s) {
     `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)} m`;
 }
 
-// A word when the combined force acts off the beam, or so close to the wall that no arrow is
-// drawn (both judged on the printed value, and worded like the figure's text).
+// A word when the combined force acts off the beam (judged on the printed value).
 function panelWhere(x) {
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
   if (shown < 0) return ' (off the beam, left of the wall)';
-  if (shown > BEAM_L) return ' (off the beam, beyond C)';
-  const wall = wallWord(x);
-  return wall ? ` (${wall}: no arrow is drawn)` : '';
+  return shown > BEAM_L ? ' (off the beam, beyond C)' : '';
 }
 
 // True when working the sum from the PRINTED (rounded) locations would not print the printed answer.

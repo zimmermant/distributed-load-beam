@@ -1,4 +1,4 @@
-import { BEAM_L, WALL_CLEAR_M } from './physics.js';
+import { BEAM_L } from './physics.js';
 
 export const MINUS = '−';
 
@@ -31,22 +31,11 @@ export function forceWords(F) {
   return `${text} N ${F > 0 ? 'down' : 'up'}`;
 }
 
-// '' away from the wall; 'at the wall' or 'near the wall' for a location that gets no arrow
-// (x < WALL_CLEAR_M, the rule of layout.js forceArrow). Judged on the PRINTED value: a location
-// that prints 0.00 is "at" the wall, one that prints 0.01..0.12 is "near" it, and one that prints
-// below 0 is off the beam instead (that note is locWords's and panelWhere's).
-export function wallWord(x) {
-  if (x === null || x === undefined || !(x < WALL_CLEAR_M)) return '';
-  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  if (shown < 0) return '';
-  return shown === 0 ? 'at the wall' : 'near the wall';
-}
-
-// Location in words; '' when there is none (x null). Flags a point beyond the beam, or at or near the wall.
+// Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
 export function locWords(x) {
   if (x === null || x === undefined) return '';
   // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : wallWord(x);
+  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
   return `at x = ${fmtFixed(x)} m from A${word ? ` (${word})` : ''}`;
 }

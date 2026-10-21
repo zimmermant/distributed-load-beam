@@ -283,24 +283,43 @@ test('render clears the figure first: a second render replaces, never adds', () 
   assert.equal(svg.children.length, draw(STATES[4]).children.length);
 });
 
-test('a combined force that acts at the wall gets no arrow, and its text says so', () => {
+test('a combined force that acts at the wall gets its arrow, drawn at the wall end, and plain text', () => {
   for (const s of [{ r: 100, t: -150, peak: 'B' }, { r: -100, t: 150, peak: 'B' }]) {
     const svg = draw(s);
     const arrows = arrowGroups(svg).map(arrowOf).filter(a => a.width === 3.4);
-    assert.equal(arrows.length, 2, 'only the rectangle and the triangle have arrows');
-    assert.ok(arrows.every(a => a.color !== COLORS.comb));
+    assert.equal(arrows.length, 3, 'rectangle, triangle and combined all have arrows');
+    const comb = arrows.filter(a => a.color === COLORS.comb);
+    assert.equal(comb.length, 1);
+    assert.equal(comb[0].x, colX(2, 0));
     const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2]);
-    assert.equal(third[0].textContent, 'at x = 0.00 m from A (at the wall)');
+    assert.equal(third[0].textContent, 'at x = 0.00 m from A');
   }
 });
 
-test('a combined force just off the wall (x = 0.10 m) gets no arrow and its text says "near the wall"', () => {
+test('a combined force just off the wall (x = 0.10 m) gets its arrow and plain text', () => {
   const svg = draw({ r: -130, t: 190, peak: 'B' });
   const arrows = arrowGroups(svg).map(arrowOf).filter(a => a.width === 3.4);
-  assert.equal(arrows.length, 2);
-  assert.ok(arrows.every(a => a.color !== COLORS.comb));
+  assert.equal(arrows.length, 3);
+  const comb = arrows.filter(a => a.color === COLORS.comb);
+  assert.equal(comb.length, 1);
+  const x = derive({ r: -130, t: 190, peak: 'B' }).comb.x;
+  assert.ok(x > 0.09 && x < 0.11, `x ${x}`);
+  assert.equal(comb[0].x, colX(2, x));
   const third = columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2] && num(n.attrs.x) === COLS.x[2]);
-  assert.equal(third[0].textContent, 'at x = 0.10 m from A (near the wall)');
+  assert.equal(third[0].textContent, 'at x = 0.10 m from A');
+});
+
+test('no text in the figure says "wall" or "no arrow" for any slider state (full sweep, counted)', () => {
+  let states = 0, wallStates = 0;
+  for (const peak of ['A', 'B']) for (let r = -200; r <= 200; r += 5) for (let t = -200; t <= 200; t += 5) {
+    const s = { r, t, peak };
+    const d = derive(s);
+    states++;
+    if (d.comb.x !== null && d.comb.x >= 0 && d.comb.x < 0.12) wallStates++;
+    for (const n of texts(draw(s))) assert.ok(!/wall|no arrow/i.test(n.textContent), `${r},${t},${peak}: "${n.textContent}"`);
+  }
+  assert.equal(states, 2 * 81 * 81);
+  assert.ok(wallStates >= 4, `only ${wallStates} states put the combined force within 0.12 m of the wall`);
 });
 
 // ---- dotted outlines of the load in the three columns ----------------------------------------

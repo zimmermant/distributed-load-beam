@@ -1,5 +1,66 @@
 # Lab Notebook
 
+## 2026-10-21 - Merged: arrow at the wall, controls below the figure
+
+### Summary
+`feat/wall-arrow-stacked-layout` was merged into `main` with `--no-ff` (merge commit e587e64) at Todd's request ("merge and republish"). `main` had not moved since the fork (1b38e8a), so the merge was clean. The branch carries Todd's two changes after he reviewed the published page: the equivalent-force arrow is drawn at and near the wall again (the 0.12 m suppression and its notes are withdrawn; at x = 0 the head partly overlaps the wall, which he accepted), and the controls and calculation always sit below the figure in one centred 740 px column.
+
+### Decisions made
+- Local merge, `--no-ff`; the branch was deleted afterwards.
+- Re-verified on the merged tree: 172 of 172 tests pass; `node build.js` reproduces the committed `dist/distributed_load_beam.html` byte-for-byte (39,039 bytes); tree clean. Before the merge the harness was clean at 800x750, 1280x720 and 1000x700 and the full mutation audit caught all 338 rows with every test covered.
+- Republishing is done by adding a new commit on top of the existing public history (no history rewrite, no force-push): clone the public repo, copy the tracked files of this repo without `docs/`, scrub local paths from `lab_notebook.md`, run the tests there, commit, push. The record of that step follows below.
+
+### Problems encountered
+None during the merge.
+
+### Open questions / next steps
+- Not yet tried inside a real Canvas iframe.
+- Sources: `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`, `docs/superpowers/sdd-ledger-distributed-load-beam.md` (the rulings and fix rounds), `../torque_i_beam`.
+
+## 2026-10-21 - Force arrow drawn at the wall again; controls and calculation always below the figure
+
+### Summary
+Two changes Todd approved in chat ("Three columns is fine. You can show the arrow near the wall. Put the slider boxes below the diagrams, not off to the side. Everything else looks good."). (A) The 0.12 m wall rule is withdrawn: `forceArrow(k, F, x)` in `src/layout.js` returns null only for F = 0, x null/undefined, x < 0 or x > 4 m, so every 0 <= x <= 4 draws, including x = 0 and 0 < x < 0.12, on the same fixed scale with the head on the correct beam face. `WALL_CLEAR_M` (`src/physics.js`) and `wallWord` (`src/format.js`) are gone; `locWords` prints plain `at x = 0.00 m from A` and keeps its off-the-beam logic untouched; the calculation (`src/panel.js` `panelWhere`) loses the "(at the wall: no arrow is drawn)" / "(near the wall: ...)" notes and keeps "(off the beam, left of the wall)", "(off the beam, beyond C)" and the "worked from the unrounded locations" note (that note depends only on `panelNeedsExact`, not on the wall states). `src/scene.js` needed no change. (B) `src/styles.css` loses the `min-width: 1150px` query (figure left, 340 px right column): at every width the order is title, link note, figure (max 740 px, centred), then the controls and the calculation, side by side from 700 px (stacked below) in the sticky bottom row, which now stays sticky on wide windows too. Tests 168 -> 170; mutation rows 335 -> 336, all caught, 170 of 170 tests covered (`docs/superpowers/mutation-coverage-run.txt`). `dist/` rebuilt (38.9 KB). **Fix round 1 (same day, after the review; 0 Critical/Important):** `.page` is now the single 740 px centred column, so the title and the From the link note line up with the figure and the panels at every width (measured by the controller at 1700x900: h1 at x = 300 vs figure at x = 480 before; at 800 px the title moves 14 px right to meet the figure); the template test now extracts every at-rule and requires exactly `@media (min-width: 700px)`, and pins that the title, note, figure and panels share the column; harness checks renumbered 1-8 (the dotted-outline check is now 7 and the font-size check 8; older notebook entries below use the old numbers 9 and 7); README lead-in fixed (the drawn-arrow bullets are now paragraphs above "When there is no arrow"). Totals: 172 tests, 338 mutation rows all caught, 172 of 172 tests covered.
+
+### Decisions made
+- **Todd withdrew the 0.12 m wall rule.** It existed because a force at x = 0 (e.g. r = 100, t = -150, peak B: 50 N down at x = 0.00 m) puts the arrow head (half-width 3.4 * 1.6 + 1 = 6.44 units) over the wall rectangle, and the spec forbids overlaps; 0.12 m * 60 units/m = 7.2 units was the smallest distance that cleared it. He accepts the partial overlap at exactly x = 0 and wants the arrow shown ("You can show the arrow near the wall"), so the arrow is drawn and the overlap is not a defect. The text no longer says "at the wall" / "near the wall"; a location that prints 0.00 m simply prints `at x = 0.00 m from A`. A location just below zero (x < 0) still gets no arrow and is "off the beam" only if it PRINTS below 0.00 (unchanged).
+- Because the old guard `x < 0.12` also caught null (null < 0.12), the new guard needs the explicit `x === null` (and `x === undefined`) checks; each has a mutation row.
+- The browser harness lost the old check (8) (arrow groups vs `.wall` elements) and its `walls` list; the sweep still includes r=100, t=-150 (x = 0) and [-130, 190] (x = 0.10), and both now draw an arrow. Check (5) (arrows vs the A/B/C circles) stays: an arrow at x = 0 is tangent to circle A (head tip at the beam face = circle top), which the 0.5-unit tolerance allows.
+- Layout: the 1150 breakpoint arithmetic (740 + 20 + 340 + 32 + 15) no longer exists. The only media query is 700 px, for the side-by-side sticky row; on a wide window the page just has empty margins around the 740 px figure. The harness `budget()` row logic (the sticky `.side` row vs the figure) is unchanged and still meaningful: the row is always below the figure, so overlap means it covers it; its header comment is updated.
+- Tests: wall-rule tests replaced, not weakened (layout: drawn at 0, -0, 0.05, 0.1199, 0.12 and 4, null at -0.001 and 4.001, head faces at the wall for all three columns, the x = 0 combined arrow at `colX(2, 0)` with its head on the beam top; format: `locWords(0)` and `locWords(0.05)` plain, a 0.001-step scan for no "wall" wording; panel: no wall text for the near-wall states; scene: the wall state draws the combined arrow, and a sweep over all 2 * 81 * 81 states finds no "wall" or "no arrow" text, with a floor of at least 4 states inside the old wall zone). `test/template.test.js`: the 1150 / 740 + 340 test is replaced by three tests (figure container 740 px and `margin: 0 auto`; no media query above 700, no `1150`, no `340px`, no grid on `.page`; two columns at 700 px with the opaque sticky row and never `position: static`).
+- Mutation rows: 13 rows whose find text no longer exists were removed (2 physics, 6 format, 2 layout, 2 panel, 1 styles) and 14 added (format: wall note added back at 0.00 or below 0.12; layout: `x < 0` guard removed, `x <= 0`, `x < 0.05`, `x < 0.12`, `x >= BEAM_L`, null location drawn; panel: wall note added back; styles: figure not centred, page grid back, side-by-side row at 1150 px, sticky row static on wide windows, never two columns). The old `layout.js` "beyond C" and "undefined" rows and the format/panel "off the beam" and "beyond C" rows were re-pointed at the new source text.
+
+### Problems encountered
+- First TDD pass: the scene test for r=-130, t=190 asserted the combined arrow at `colX(2, 0.1)`, but that state's x is 0.1004...; the test now reads the x from `derive`. Everything else went red for the right reason (the old wall wording, null arrows) and green after the source change.
+- Accepted edge case: for a combined location in (-0.005, 0) the arrow is withheld (x < 0) but the text prints plain `0.00 m` (off the beam is judged on the printed value), so there is no arrow and no explanation. Unreachable from slider values or snapped presets (all 2 x 81 x 81 states checked), reachable only from off-grid inputs.
+- A first mutation run was stopped after about 40 rows to add the null-location row (found while documenting that `x === null` is no longer redundant), then rerun in full: 336 rows, about 14 minutes.
+- Not verifiable here (no browser): the figure and both panels fitting without scrolling at 800x750, 1280x720 and 1000x700, text >= 12 px, the look of the head overlapping the wall at x = 0, and the harness result. The controller runs those.
+
+### Open questions / next steps
+- Browser check of the three viewports and `H.all()` (176 combinations; expect `violations: []`, `flagged: true`, `budget.ok: true` at 800x750 and 1280x720). If the stacked layout cannot fit 1280x720 (the old right column freed vertical room there), that has to be reported rather than shrinking text.
+- The 2026-10-20 entries below keep their historical statements about the wall rule and the 1150 layout; they describe the code as it was then.
+- Republish to the public Pages repo only on Todd's say-so (procedure in the 2026-10-20 publish entry).
+- Sources: Todd's chat request above; spec `docs/superpowers/specs/2026-10-20-distributed-load-beam-design.md`; the earlier wall ruling in `docs/superpowers/sdd-ledger-distributed-load-beam.md` (Task 8); live app https://zimmermant.github.io/distributed-load-beam/ (still the old build until republished); `README.md` (layout, wall and harness sections updated).
+
+## 2026-10-20 - Published to GitHub Pages
+
+### Summary
+Published at Todd's request ("publish to github pages") to https://zimmermant.github.io/distributed-load-beam/ (public repo https://github.com/zimmermant/distributed-load-beam, Pages from `main` at `/`). The live `dist/distributed_load_beam.html` is byte-identical to the local build; on the live page the browser harness is clean (176 combinations, 0 violations, text 12.3 px, all probes caught, budget ok at 800x750) and the README's preset link shows the numbers the README says.
+
+### Decisions made
+- Same pattern as `torque_i_beam`: a separate public repo, `docs/` (specs, plans, ledger, audit report) stripped from the published history, MIT licence, root `index.html` redirecting to `dist/distributed_load_beam.html`. The redirect drops query strings, so preset links and the embed snippet use the full `dist/...` address (the README says so and now carries the real address).
+- Beyond stripping `docs/`, the public history is also scrubbed: older notebook versions contained an absolute local path and a cloud-folder name, so those strings were replaced in the public copy's history (a tree scan alone would not have found them).
+- The local repo has NO remote on purpose: the public history is a filtered copy with different commit hashes.
+- Pre-publish checks on the public copy: zero local-path or cloud-folder strings in the tree or in the whole history, no `docs/`, `.superpowers/`, `.claude/` or `CLAUDE.md` ever present, no secret-like strings (only the author email in commit metadata, as in the sibling repos), 168 of 168 tests pass on their own, the build is reproducible and identical to the real repo's dist.
+- To republish: commit locally; `git clone --no-hardlinks . <tmp>`; ASSERT the clone's `git rev-parse --show-toplevel` is the tmp path and differs from the real repo BEFORE any history rewrite; in the clone run `git filter-branch -f --tree-filter '<script replacing local paths and cloud-folder names in lab_notebook.md>' --index-filter 'git rm -r -q --cached --ignore-unmatch docs' -- --all`, delete `refs/original/*` and `refs/remotes/*`, re-scan tree and history, run the tests, then force-push the filtered history to the public repo (a republish rewrites its history; coordinate that with Todd) or add the new commits on top of the published history.
+
+### Problems encountered
+- A slip of mine during the publish step (the build ledger has the full account): `git clone` into the scratch directory failed with a hardlink error, a chained `cd` never ran, and `git filter-branch` ran in the REAL repository, removing `docs/` from its history and working tree for a moment. `filter-branch` had kept a backup ref at the exact previous commit (705479e) and the tree was clean, so `main` was reset to it: 31 commits with the original hashes, `docs/` restored, `fsck` clean, 168 tests pass, dist matches HEAD. The rewrite was then redone in a guarded no-hardlinks clone. Nothing was pushed from the real repo at any time.
+
+### Open questions / next steps
+- Items awaiting Todd's confirmation: three columns instead of the mockup's rows; a force within 0.12 m of the wall draws no arrow (text says "at the wall" / "near the wall"); the peak buttons no longer say "(wall)"; very small forces draw as a speck on the fixed scale.
+- Not yet tried inside a real Canvas iframe.
+
 ## 2026-10-20 - Merged to main
 
 ### Summary

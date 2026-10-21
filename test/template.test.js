@@ -84,17 +84,63 @@ test('the zero labels have ids that app.js looks up', () => {
   }
 });
 
-// Viewport budget arithmetic: the figure must stay >= 740 px wide wherever the page is >= 800 px wide
-// (text >= 12 px needs figure >= 720), including at the two-column breakpoint.
-test('figure max-width is 740 and the two-column breakpoint leaves it 740 px wide', () => {
-  assert.match(css, /\.fig-col \{ max-width: 740px;/);
-  const widths = [...css.matchAll(/@media \(min-width: (\d+)px\)/g)].map(m => Number(m[1]));
-  assert.ok(widths.includes(700), 'a 700 px breakpoint');
-  const col = Math.max(...widths);
-  const need = 740 + 20 + 340 + 32 + 15;   // figure + gap + right column + body padding + a scrollbar
-  assert.ok(col >= need, `two-column breakpoint ${col} < ${need}`);
-  assert.match(css, /grid-template-columns: minmax\(0, 740px\) 340px/);
-  assert.match(css, /position: sticky; bottom: 0/);
+// Page layout: one column at every width. Title, link note, the figure (at most 740 px wide, centred),
+// then controls and calculation side by side (stacked below 700 px). The only media query is the 700 px
+// one for that row; nothing turns the page into columns on a wide window.
+const cssBare = css.replace(/\/\*[\s\S]*?\*\//g, '');                       // comments out, so a word in one is not an at-rule
+const mediaBlocks = [...cssBare.matchAll(/@media \(min-width: (\d+)px\) \{([\s\S]*?)\n\}/g)].map(m => ({ width: Number(m[1]), body: m[2] }));
+// Every at-rule prelude in the file ('@media (min-width: 700px)', '@media (min-width: 900px) and (min-height: 1px)', '@supports ...'), whitespace collapsed.
+const atRules = [...cssBare.matchAll(/(@[a-zA-Z-]+[^{;]*)\{/g)].map(m => m[1].trim().replace(/\s+/g, ' '));
+
+test('figure container: max-width 740 px and centred with auto side margins', () => {
+  const rule = css.match(/\.fig-col \{([^}]*)\}/);
+  assert.ok(rule, 'no .fig-col rule');
+  assert.match(rule[1], /max-width: 740px;/);
+  assert.match(rule[1], /margin: 0 auto;/);
+  assert.match(css, /#fig \{[^}]*width: 100%;/);
+});
+
+test('no media query turns the page into columns: no 1150 breakpoint, no 740 + 340 grid, no grid on .page', () => {
+  assert.ok(!/1150/.test(css), 'styles.css still mentions 1150');
+  assert.ok(!/min-width: (?!700px)\d+px/.test(cssBare), 'a min-width other than 700 px');
+  assert.ok(!/grid-template-columns: minmax\(0, 740px\) 340px/.test(css), 'the 740 + 340 page grid is back');
+  assert.ok(!/340px/.test(css), 'a 340 px right column is back');
+  assert.ok(!/\.page[^{]*\{[^}]*display: grid/.test(css), '.page is a grid');
+  assert.ok(!/\.page > /.test(css), 'a .page > child rule (the old grid placement)');
+  assert.ok(mediaBlocks.length >= 1, 'the 700 px block was not found');
+  for (const m of mediaBlocks) assert.equal(m.width, 700, `a min-width ${m.width}px media query`);
+  assert.equal(mediaBlocks.length, 1, 'exactly one min-width media query (700 px)');
+});
+
+test('the only at-rule in styles.css is @media (min-width: 700px): no compound, max-width, min-height or other query', () => {
+  assert.deepEqual(atRules, ['@media (min-width: 700px)'], `at-rules found: ${atRules.join(' | ')}`);
+});
+
+test('the title and the From the link note sit in the same 740 px centred column as the figure and the panels', () => {
+  // .page is the one column: max-width 740 px, centred; the h1, #from-link, .fig-col and .side are all its children
+  const page = cssBare.match(/\.page \{([^}]*)\}/);
+  assert.ok(page, 'no .page rule');
+  assert.match(page[1], /max-width: 740px;/);
+  assert.match(page[1], /margin: 0 auto;/);
+  const main = template.match(/<main class="page">([\s\S]*)<\/main>/);
+  assert.ok(main, 'the template has no <main class="page">');
+  const body = main[1];
+  const at = (needle) => body.indexOf(needle);
+  assert.ok(at('<h1>') >= 0 && at('<p id="from-link"') >= 0 && at('<div class="fig-col">') >= 0 && at('<div class="side">') >= 0, 'all four are inside main.page');
+  assert.ok(at('<h1>') < at('<p id="from-link"') && at('<p id="from-link"') < at('<div class="fig-col">') && at('<div class="fig-col">') < at('<div class="side">'), 'order: title, link note, figure, controls');
+  assert.ok(!/(^|\n)\s*(h1|#from-link)\s*\{[^}]*(margin-left|padding-left|max-width|width)/.test(cssBare), 'the h1 or #from-link has its own width or side offset');
+});
+
+test('controls and calculation: stacked below 700 px, two columns at 700 px and up, sticky at every width from 700 px', () => {
+  assert.match(css, /\.side \{[^}]*grid-template-columns: 1fr;/);          // base: stacked
+  assert.match(css, /\.side \{[^}]*max-width: 740px;[^}]*margin: 6px auto 0;/);
+  const m = mediaBlocks.find(b => b.width === 700);
+  assert.ok(m, 'a 700 px breakpoint');
+  assert.match(m.body, /\.side \{[^}]*grid-template-columns: 1\.25fr 1fr;/);
+  assert.match(m.body, /position: sticky; bottom: 0;/);
+  assert.match(m.body, /background: #ffffff;/);                              // opaque, so the figure does not show through
+  assert.match(m.body, /border-top: 1px solid/);
+  assert.ok(!/position: static/.test(css), 'the sticky row is turned static somewhere');
 });
 
 test('the From the link line starts hidden and empty, and is a plain paragraph', () => {

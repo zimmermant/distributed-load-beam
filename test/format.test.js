@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MINUS, fmt, fmtFixed, forceWords, locWords, wallWord } from '../src/format.js';
+import { MINUS, fmt, fmtFixed, forceWords, locWords } from '../src/format.js';
 import { equivalents } from '../src/physics.js';
 
 test('MINUS is U+2212', () => {
@@ -52,11 +52,11 @@ test('locWords: null, on the beam, off the beam', () => {
   assert.equal(locWords(null), '');
   assert.equal(locWords(1), 'at x = 1.00 m from A');
   assert.equal(locWords(1.1111), 'at x = 1.11 m from A');
-  assert.equal(locWords(0), 'at x = 0.00 m from A (at the wall)');
-  assert.equal(locWords(-0), 'at x = 0.00 m from A (at the wall)');
-  assert.equal(locWords(0.05), 'at x = 0.05 m from A (near the wall)');
+  assert.equal(locWords(0), 'at x = 0.00 m from A');
+  assert.equal(locWords(-0), 'at x = 0.00 m from A');
+  assert.equal(locWords(0.05), 'at x = 0.05 m from A');
   assert.equal(locWords(0.12), 'at x = 0.12 m from A');
-  assert.equal(locWords(-0.001), 'at x = 0.00 m from A (at the wall)');
+  assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
   assert.equal(locWords(4), 'at x = 4.00 m from A');
   assert.ok(locWords(-16 / 3).endsWith('(off the beam)'));
   assert.equal(locWords(-16 / 3), 'at x = −5.33 m from A (off the beam)');
@@ -83,26 +83,15 @@ test('no forceWords/locWords result contains -0, NaN or Infinity', () => {
   assert.equal(n, 81 * 81 * 2 * 3);
 });
 
-test('locWords: "at the wall" only where it prints 0.00, "near the wall" for the rest of 0 <= x < 0.12, never with "off the beam"', () => {
-  assert.equal(locWords(0.1199), 'at x = 0.12 m from A (near the wall)');
-  assert.equal(locWords(0.1), 'at x = 0.10 m from A (near the wall)');
-  assert.equal(locWords(0.005), 'at x = 0.01 m from A (near the wall)');
-  assert.equal(locWords(0.0049), 'at x = 0.00 m from A (at the wall)');
-  assert.equal(locWords(0.12), 'at x = 0.12 m from A');
+test('locWords: no wall wording anywhere on the beam; off the beam is judged on the printed value', () => {
+  assert.equal(locWords(0.1199), 'at x = 0.12 m from A');
+  assert.equal(locWords(0.1), 'at x = 0.10 m from A');
+  assert.equal(locWords(0.005), 'at x = 0.01 m from A');
+  assert.equal(locWords(0.0049), 'at x = 0.00 m from A');
   assert.equal(locWords(0.5), 'at x = 0.50 m from A');
-  assert.equal(locWords(-0.001), 'at x = 0.00 m from A (at the wall)');
-  assert.equal(locWords(-0.0049), 'at x = 0.00 m from A (at the wall)');
+  assert.equal(locWords(-0.001), 'at x = 0.00 m from A');
+  assert.equal(locWords(-0.0049), 'at x = 0.00 m from A');
   assert.equal(locWords(-0.2), 'at x = −0.20 m from A (off the beam)');
   assert.equal(locWords(-0.005), 'at x = −0.01 m from A (off the beam)');
-});
-
-test('wallWord: empty away from the wall and for null; at / near by the printed value', () => {
-  assert.equal(wallWord(null), '');
-  assert.equal(wallWord(undefined), '');
-  assert.equal(wallWord(1), '');
-  assert.equal(wallWord(0.12), '');
-  assert.equal(wallWord(0.11), 'near the wall');
-  assert.equal(wallWord(0), 'at the wall');
-  assert.equal(wallWord(-0), 'at the wall');
-  assert.equal(wallWord(-0.3), '');
+  for (let x = -0.3; x <= 0.3; x += 0.001) assert.ok(!/wall/.test(locWords(x)), `${x}: ${locWords(x)}`);
 });

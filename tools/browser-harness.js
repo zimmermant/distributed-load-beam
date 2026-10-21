@@ -7,7 +7,8 @@
 //   eval(await (await fetch('/tools/browser-harness.js')).text());
 //   H.install();  H.sweep();  H.sensitivity();  H.budget();     // or just H.all()
 //
-// Run it at three viewports (set the Browser pane, then RELOAD, then install):
+// Run it at three viewports (set the Browser pane, then RELOAD, then install). The layout is the same at
+// every width (figure, then controls and calculation below it), so the viewports differ only in room:
 //   1280x720  and  800x750   every phase must pass: violations [], flagged true, budget.ok true
 //   1000x700                 the controls must at least be visible (controlsVisible true);
 //                            page scroll is acceptable there if they stay on screen
@@ -23,9 +24,9 @@
 //                one past the viewBox edge, one at font-size 10, and two dotted-outline paths (one
 //                above the column band, one between the columns); requires checkFigure to name
 //                each, and a clean figure after removal: proves the checker can see each fault.
-//   budget       the page fits (scrollHeight <= innerHeight), the sticky controls row does not
-//                cover the figure, #controls and #calc show all their content, bottoms <=
-//                innerHeight, no horizontal scroll. (The row is position: sticky; bottom: 0, so a
+//   budget       the page fits (scrollHeight <= innerHeight), the sticky controls row (controls and
+//                calculation, below the figure at every width) does not cover the figure, #controls
+//                and #calc show all their content, bottoms <= innerHeight, no horizontal scroll. (The row is position: sticky; bottom: 0, so a
 //                bottom <= innerHeight alone proves nothing: its rect is clamped to the viewport.)
 (function () {
   const VB = { w: 960, h: 560 };
@@ -33,13 +34,15 @@
   const MIN_FIG_PX = 600;
   const MIN_TEXT_PX = 12;
   const GRID = [-200, -150, -100, -15, 0, 15, 100, 150, 200];
-  // near-cancel pairs, plus [-130, 190] whose combined force is at x = 0.10 m (the 'near the wall' text, no arrow)
+  // near-cancel pairs, plus [-130, 190] whose combined force is at x = 0.10 m (its arrow is drawn close to the wall)
   const NEAR_CANCEL = [[100, -190], [100, -195], [100, -200], [-100, 190], [-100, 195], [-100, 200], [-130, 190]];
   const DEFAULTS = { r: 100, t: 100, peak: 'B' };
   const EXPECTED_COMBOS = 9 * 9 * 2 + 7 * 2;   // 176: the grid plus the 7 near-cancel / near-wall pairs, both peaks
+  // The grid also holds r = 100, t = -150 (peak B): the combined force acts at x = 0, so its arrow is drawn at the wall end.
+  // At x = 0 the head partly overlaps the wall rectangle: accepted, so the harness has no arrow-versus-wall check.
   const MIN_TEXTS = 20, MIN_GS = 20;   // non-vacuity floors: a checker that finds nothing to measure proves nothing
   const MIN_OUTLINES = 400;            // sweep floor: 142 of the 176 combos draw >= 3 dotted outlines, 32 draw 2 and 2 draw none; the real total is about 528, so 400 is a safe floor
-  // Column geometry for check 9, the same numbers as COLS, BEAM_H and LOADED_L in src/layout.js
+  // Column geometry for check 7, the same numbers as COLS, BEAM_H and LOADED_L in src/layout.js
   // (test/layout.test.js reads this file and fails if they drift apart).
   const COLS_X = [20, 330, 640], COLS_OFFSET = 30, COLS_PX = 60, COLS_BEAM_Y = 424, COLS_BAND = 108, BEAM_H = 24, LOADED_L = 2;
   const OUTLINE_Y = [COLS_BEAM_Y - COLS_BAND, COLS_BEAM_Y + BEAM_H + COLS_BAND];
@@ -90,8 +93,7 @@
     const gs = topLevelG().map(el => ({ el, b: box(el) }));
     const outlines = Array.from(fig.querySelectorAll('.outline')).map(el => ({ el, b: box(el) }));
     const pcs = gs.filter(g => g.el.classList.contains('pc'));
-    const walls = gs.filter(g => g.el.classList.contains('wall'));
-    const arrows = gs.filter(g => !g.el.classList.contains('pc') && !g.el.classList.contains('wall') &&
+    const arrows = gs.filter(g => !g.el.classList.contains('pc') &&
       g.el.tagName === 'g' && g.el.firstElementChild && g.el.firstElementChild.tagName === 'line');
 
     for (const x of texts.concat(tins)) if (outside(x.b)) bad(`${name(x.el, x.b)} outside the viewBox`);          // 1
@@ -108,10 +110,7 @@
       if (hits(a.b, c.b)) bad(`${name(a.el, a.b)} overlaps circle ${name(c.el, c.b)}`);
     }
     for (const g of gs) if (outside(g.b)) bad(`${name(g.el, g.b)} outside the viewBox`);                         // 6
-    for (const a of arrows) for (const w of walls) {                                                             // 8
-      if (hits(a.b, w.b)) bad(`${name(a.el, a.b)} overlaps wall ${name(w.el, w.b)}`);
-    }
-    for (const o of outlines) {                                                                                  // 9
+    for (const o of outlines) {                                                                                  // 7
       const inY = o.b.y0 >= OUTLINE_Y[0] - EPS && o.b.y1 <= OUTLINE_Y[1] + EPS;
       const inX = OUTLINE_X.some(([a, z]) => o.b.x0 >= a - EPS && o.b.x1 <= z + EPS);
       if (!inY || !inX) bad(`${name(o.el, o.b)} outside its column band`);
@@ -119,7 +118,7 @@
     if (texts.length + tins.length < MIN_TEXTS) bad(`only ${texts.length + tins.length} texts found (< ${MIN_TEXTS}): the checks are vacuous`);
     if (gs.length < MIN_GS) bad(`only ${gs.length} top-level .g found (< ${MIN_GS}): the checks are vacuous`);
 
-    const scale = fig.getBoundingClientRect().width / VB.w;                                                      // 7
+    const scale = fig.getBoundingClientRect().width / VB.w;                                                      // 8
     let minPx = Infinity;
     for (const el of fig.querySelectorAll('text')) {
       const px = parseFloat(el.getAttribute('font-size')) * scale;
@@ -174,7 +173,7 @@
         combos++;
       }
       if (combos !== EXPECTED_COMBOS) violations.push(`sweep ran ${combos} combos, expected ${EXPECTED_COMBOS}`);
-      if (outlineTotal < MIN_OUTLINES) violations.push(`sweep found only ${outlineTotal} dotted outlines (< ${MIN_OUTLINES}): check 9 is vacuous`);
+      if (outlineTotal < MIN_OUTLINES) violations.push(`sweep found only ${outlineTotal} dotted outlines (< ${MIN_OUTLINES}): check 7 is vacuous`);
     } finally {
       for (const p of restore()) violations.push(p);
     }
@@ -254,7 +253,7 @@
     const figRect = fig.getBoundingClientRect();
     const figBottom = bottom(fig), controlsBottom = bottom(ui.controls), calcBottom = bottom(ui.calc);
     const pageHeight = doc.scrollHeight;
-    const sideOverlap = inter(ui.controls.parentElement.getBoundingClientRect(), figRect);   // the sticky .side row vs the figure, px^2
+    const sideOverlap = inter(ui.controls.parentElement.getBoundingClientRect(), figRect);   // the sticky .side row vs the figure, px^2 (the row sits below the figure; a non-zero value means it covers it)
     const controlsOverlap = inter(ui.controls.getBoundingClientRect(), figRect);
     const calcOverlap = inter(ui.calc.getBoundingClientRect(), figRect);
     const controlsClipped = ui.controls.scrollHeight > ui.controls.clientHeight + 1;

@@ -42,13 +42,15 @@ Positive F points down. The three arrows share **one fixed scale** (the same len
 
 In each of the three columns a **dotted outline of the load that column's force replaces** is drawn behind the arrow: the rectangle, the triangle, and the net load w(x) = r + t·f(x) (a trapezoid, or two triangles on opposite sides of the beam where the net load changes sign inside AB). It uses the same height scale as the top figure, spans AB only, sits on the face of the beam the load pushes from, and is absent when that load is zero. The arrow ends up inside its outline by design: it stands for the whole load at its centroid.
 
+**A force at or near the wall** (0 ≤ x̄ < 0.12 m) is drawn like any other, at the same fixed scale, with its head on the correct beam face, and its text and calculation carry no wall note. At x̄ = 0 exactly the arrow head partly overlaps the wall rectangle: that is accepted and is not a defect. Examples: r = 100, t = −150, peak B gives 50 N down at x̄ = 0.00 m; r = −130, t = 190, peak B gives 70 N up at x̄ = 0.10 m.
+
+**A very small force** (a few newtons) is still drawn to the same fixed scale, so its arrow can be a short sliver. That is deliberate: the scale never changes, and the text under the figure carries the value.
+
 When there is no arrow, the text under the figure says why:
 
 - **A part that is zero** has no force and no location ("no load of this kind").
 - **The combined force has no location only when F is exactly 0.** If both parts are non-zero that is a **couple**: equal and opposite forces at different places, which no single force can replace. The page says so ("the parts cancel: no single force") and adds a short note in the calculation. If both parts are zero it simply says "no load".
 - **The combined force can land off the beam** when opposite loads nearly cancel (for example r = 100, t = −190, peak B puts x̄ at −5.33 m, left of the wall; r = 100, t = −195, peak A puts it at 14.00 m, beyond C). No arrow is drawn, and the text says "(off the beam)". The calculation says whether that is left of the wall or beyond C.
-- **A force within 0.12 m of the wall** (0 ≤ x̄ < 0.12 m, `WALL_CLEAR_M` in `src/physics.js`) is not drawn either, because the arrow head would overlap the wall. The text says "(at the wall)" when the location prints as 0.00 m and "(near the wall)" for the rest of that zone, and the calculation adds "no arrow is drawn". Examples: r = 100, t = −150, peak B gives 50 N down at x̄ = 0.00 m ("at the wall"); r = −130, t = 190, peak B gives 70 N up at x̄ = 0.10 m ("near the wall").
-- **A very small force** (a few newtons) is still drawn to the same fixed scale, so its arrow can be a short sliver. That is deliberate: the scale never changes, and the text under the figure carries the value.
 
 Nothing here is stored: the state is only `r`, `t` and `peak`, and everything else is computed from them.
 
@@ -73,7 +75,7 @@ Worked example links (shown relative to the page; put the `?...` part after `dis
 ```
 distributed_load_beam.html?r=100&t=100&peak=B      # the defaults, written out
 distributed_load_beam.html?r=100&t=-200&peak=B     # the parts cancel: F = 0, a couple, no single force
-distributed_load_beam.html?r=100&t=-150&peak=B     # combined 50 N down at the wall: no arrow, text says "at the wall"
+distributed_load_beam.html?r=100&t=-150&peak=B     # combined 50 N down at x = 0.00 m: the arrow is drawn at the wall end (its head overlaps the wall slightly)
 distributed_load_beam.html?r=-75&t=150&peak=A      # equal and opposite parts (−150 N and +150 N): another couple
 ```
 
@@ -96,8 +98,8 @@ The page contains no frame-busting code and sets no frame-blocking meta tag; the
 The budgets drove the layout, and the numbers matter if you change the CSS (`src/styles.css`):
 
 - The **figure is capped at 740 px wide** (a 960 × 560 viewBox, so SVG text of 16 units renders at about 12.3 px, just over the 12 px floor).
-- From 700 px up, the **controls and the calculation sit in one row under the figure, and that row sticks to the bottom of the window**, so the controls stay in view while the figure is watched.
-- From **1150 px** up, the figure is on the left and the controls over the calculation are in a 340 px right column. The breakpoint is computed: 740 + 20 gap + 340 + 32 body padding = 1132, plus up to 15 px for a scrollbar = 1147, rounded up to 1150. Below it the figure would shrink under 740 px and its text under 12 px.
+- **The controls and the calculation are below the figure at every window width; there is no side column.** The order is the title, the "From the link" note, the figure (centred when the window is wider than 740 px), then the controls and the calculation. Below 700 px the controls and the calculation are stacked; from 700 px up they sit side by side in one row, and **that row sticks to the bottom of the window** (at every width from 700 px up, wide windows included), so the controls stay in view while the figure is watched.
+- The only media query is the 700 px one for that row. A wide window just leaves empty margins: the figure never shrinks below 740 px at 800 px and wider, so its text stays at 12 px or more.
 
 ## Develop
 
@@ -118,14 +120,14 @@ node tools/mutations.mjs --coverage --strict
 2. Open `http://127.0.0.1:8742/dist/distributed_load_beam.html` in a browser sized **800 × 750** (then reload so the layout settles).
 3. In the browser's JavaScript console: `eval(await (await fetch('/tools/browser-harness.js')).text()); H.all()`
 
-A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 176 combinations (the 9 × 9 grid of r and t, plus near-cancelling and near-wall pairs, for both peaks) and reports `violations: []` (no text touching text, a graphic, the viewBox edge or an arrow over the wall; every text at least 12 px; every dotted outline inside its column band); `sensitivity` reports `flagged: true` (it plants six faults and requires each to be named: a text on the beam, a text on another text, a text running past the viewBox edge, a size-10 text, and two dotted-outline paths outside their column band, one above it and one between the columns; then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky row does not cover the figure). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
+A pass means every phase is clean: `install` finds the figure at least 600 px wide; `sweep` drives the real sliders and peak buttons over 176 combinations (the 9 × 9 grid of r and t, plus near-cancelling and near-wall pairs, for both peaks) and reports `violations: []` (no text touching text, a graphic or the viewBox edge, and no arrow over a circle; every text at least 12 px; every dotted outline inside its column band); `sensitivity` reports `flagged: true` (it plants six faults and requires each to be named: a text on the beam, a text on another text, a text running past the viewBox edge, a size-10 text, and two dotted-outline paths outside their column band, one above it and one between the columns; then a clean figure after removal); and `budget` reports `ok: true` (the page fits without scrolling and the sticky controls and calculation row, which sits below the figure, does not cover it). Repeat at **1280 × 720**; at 1000 × 700 the controls must at least stay on screen.
 
 ## Layout of the code
 
 | Module | Job |
 |---|---|
-| `physics.js` | Constants (beam, range, step, snap zone, `WALL_CLEAR_M`), `snapW`, `nextW` (the keyboard jump), `loadAt`, `equivalents`. |
-| `format.js` | The only place a number is rounded for display: `fmt`, `fmtFixed` (locations, always two decimals), `forceWords`, `locWords`, `wallWord`. |
+| `physics.js` | Constants (beam, range, step, snap zone), `snapW`, `nextW` (the keyboard jump), `loadAt`, `equivalents`. |
+| `format.js` | The only place a number is rounded for display: `fmt`, `fmtFixed` (locations, always two decimals), `forceWords`, `locWords`. |
 | `svg.js` | `el` / `clear` / `text` helpers and the colour palette. |
 | `state.js` | The store: three stored values (`r`, `t`, `peak`); everything else is `derive()`d. |
 | `presets.js` | URL presets: `parsePresets` and `describePresets`. Held outside the state. |
@@ -144,5 +146,5 @@ A pass means every phase is clean: `install` finds the figure at least 600 px wi
 - **Fixed force scale.** Arrow length is `fs × |F|`, with no per-state rescaling.
 - **Class contracts the browser harness relies on.** Every graphic drawn by `scene.js` carries class `g` (the wall and its hatching also `wall`; the A, B, C circles also `pc`; the dotted load outlines also `outline`); every text carries class `t` (letters inside the circles: `tin`); every SVG text is at least 16 units. Remove a class and the harness stops seeing that element.
 - **Tests that scan HTML strip the tags first** (the markup carries `style` attributes with hyphens before digits), then look for `-0`, `NaN`, `Infinity` and a hyphen-minus before a digit.
-- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (335 rows; every row caught; all 168 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
+- **Every test has a named mutation it catches**, proven by `tools/mutations.mjs` (338 rows; every row caught; all 172 tests fail under at least one). Layout, overlap and fit are measured in a real browser, not eyeballed.
 - **Link text never becomes markup.** The calculation is built only from numbers formatted by `fmt` / `fmtFixed` and fixed strings; the "From the link" line is set with `textContent`.
