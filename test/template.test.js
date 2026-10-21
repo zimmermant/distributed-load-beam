@@ -156,12 +156,172 @@ test('the From the link line starts hidden and empty, and is a plain paragraph',
   assert.match(css, /#from-link\[hidden\] \{ display: none; \}/);
 });
 
-test('the calculation text is compact enough for its tallest state: 13 px text, line height 1.3, tight vertical padding, 4 px between lines', () => {
+test('the calculation text is compact enough for its tallest state: 13 px text, line height 1.25, tight vertical padding, 2 px between lines', () => {
   const calc = cssBare.match(/#calc \{([^}]*)\}/);
   assert.ok(calc, 'no #calc rule');
   assert.match(calc[1], /font-size: 13px;/, 'the calculation text must stay at least 12 px (13 px here)');
-  assert.match(calc[1], /line-height: 1\.3;/);
-  assert.match(cssBare, /#calc \.cl \{ margin-bottom: 4px; \}/);
+  assert.match(calc[1], /line-height: 1\.25;/);
+  assert.match(cssBare, /#calc \.cl \{ margin-bottom: 2px; \}/);
   assert.match(cssBare, /\.calc-panel \{ padding-top: 4px; padding-bottom: 4px; \}/);
   assert.match(cssBare, /\.calc-panel h2 \{ margin-bottom: 2px; \}/);
+});
+
+test('the main page links to the detailed calculation: after #calc, outside it, in the calculation panel, with all four states styled', () => {
+  const panel = (template.match(/<section class="panel calc-panel">[\s\S]*?<\/section>/) || [])[0];
+  assert.ok(panel, 'no calc-panel section');
+  assert.ok(panel.includes('<a id="detail-link" class="more" href="distributed_load_beam_detail.html">More detailed calculation</a>'));
+  // #calc is an empty element closed before the link starts, so no rewrite of #calc can remove the link
+  const calcEnd = panel.indexOf('<div id="calc" aria-live="polite"></div>');
+  assert.ok(calcEnd >= 0, '#calc must be an empty div');
+  assert.ok(panel.indexOf('id="detail-link"') > calcEnd + '<div id="calc" aria-live="polite"></div>'.length - 1, 'the link follows #calc');
+  assert.equal((template.match(/id="detail-link"/g) || []).length, 1);
+  // visible hover, active and keyboard-focus states, each different from the resting look
+  const rest = cssBare.match(/\.more \{([^}]*)\}/);
+  assert.ok(rest, 'no .more rule');
+  // pinned like #calc: a later edit must not silently grow the link and break the 1280x720 fit (2 px margin + one 13 px x 1.3 line)
+  assert.match(rest[1], /margin: 2px 0 0;/, 'the .more margin is 2px 0 0');
+  assert.match(rest[1], /line-height: 1\.3;/, 'the .more line height is 1.3');
+  assert.match(rest[1], /font-size: 13px;/);
+  assert.match(rest[1], /padding: 0 2px;/, 'the .more padding adds no height');
+  assert.match(rest[1], /text-decoration: underline;/, 'the link looks like a link at rest');
+  assert.match(rest[1], /width: fit-content;/, 'the link is as wide as its text, so its hover background is not a full-width bar');
+  const size = rest[1].match(/font-size: (\d+)px/);
+  assert.ok(size && Number(size[1]) >= 12, 'the link text must be at least 12 px');
+  const hover = cssBare.match(/\.more:hover \{([^}]*)\}/);
+  const active = cssBare.match(/\.more:active \{([^}]*)\}/);
+  const focus = cssBare.match(/\.more:focus-visible \{([^}]*)\}/);
+  assert.ok(hover && /background:/.test(hover[1]), 'hover changes the background');
+  assert.ok(active && /background:/.test(active[1]), 'active changes the background');
+  assert.ok(focus && /outline: \d+px solid/.test(focus[1]), 'focus-visible draws an outline');
+  assert.notEqual(hover[1].trim(), active[1].trim(), 'hover and active must look different');
+});
+
+// ---- the detail page's template -------------------------------------------------------------------
+const detailTemplate = readFileSync(join(here, '..', 'src', 'detail.template.html'), 'utf8');
+const detailCss = readFileSync(join(here, '..', 'src', 'detail.css'), 'utf8');
+const sectionText = (t) => (t.match(/<section id="controls"[\s\S]*?<\/section>/) || [])[0];
+
+test('the detail template declares both inline markers and loads nothing external', () => {
+  assert.ok(detailTemplate.includes('<!--INLINE_CSS-->'));
+  assert.ok(detailTemplate.includes('<!--INLINE_JS-->'));
+  assert.ok(!/https?:\/\//.test(detailTemplate));
+  assert.ok(!/<script[^>]+src=/.test(detailTemplate));
+  assert.ok(!/<link[^>]+href=/.test(detailTemplate));
+  assert.ok(detailTemplate.includes('<title>Distributed load on a beam: detailed calculation</title>'));
+  assert.ok(detailTemplate.includes('<meta name="viewport" content="width=device-width, initial-scale=1">'));
+});
+
+test('the detail template: h1, back link, hidden link note, then the actual-load figure, in one main.page', () => {
+  const m = detailTemplate.match(/<main class="page">([\s\S]*)<\/main>/);
+  assert.ok(m, 'no <main class="page">');
+  const body = m[1];
+  assert.ok(body.includes('<h1>Distributed load on a beam: detailed calculation</h1>'));
+  assert.ok(body.includes('<a id="back-link" href="distributed_load_beam.html">Back to the simulation</a>'));
+  assert.match(body, /<p id="from-link" hidden><\/p>/);
+  assert.match(body, /<svg id="detail-fig" viewBox="0 0 960 356" role="img" aria-label="[^"]+"><\/svg>/);
+  assert.ok(body.includes('<section id="actual" aria-labelledby="h-actual"><h2 id="h-actual">Actual load on AB</h2>'));
+  const at = (s) => body.indexOf(s);
+  const order = ['<h1>', 'id="back-link"', 'id="from-link"', 'id="actual"', 'id="detail-fig"', 'id="controls"', 'id="blk-rect"', 'id="blk-tri"', 'id="blk-comb"'];
+  const pos = order.map(at);
+  assert.ok(pos.every(i => i >= 0), order.filter((s, i) => pos[i] < 0).join(', '));
+  assert.deepEqual([...pos].sort((a, b) => a - b), pos, 'order: title, back link, note, figure, controls, three blocks');
+});
+
+test('the detail figure label has no digit without a unit', () => {
+  const label = detailTemplate.match(/<svg id="detail-fig"[^>]*aria-label="([^"]+)"/)[1];
+  assert.ok(label.includes('w_A') && label.includes('w_B'));
+  const bare = label.replace(/\d+&nbsp;(?:N\/m|N|m)\b/g, '');
+  assert.ok(!/\d/.test(bare), `a number without a unit in: ${label}`);
+});
+
+test('the detail figure sits in the figure column, and every block is labelled by its heading', () => {
+  assert.match(detailTemplate, /<div class="fig-col">\s*<svg id="detail-fig"[^>]*><\/svg>\s*<\/div>/);
+  for (const id of ['rect', 'tri', 'comb']) {
+    assert.ok(detailTemplate.includes(`<section class="dblock" id="blk-${id}" aria-labelledby="h-${id}">`), id);
+  }
+});
+
+test('the detail template has the three calculation blocks, each with its heading and an empty body', () => {
+  for (const [id, head] of [['rect', 'Calculating the rectangular loading'], ['tri', 'Calculating the triangular loading'], ['comb', 'Calculating the combined loading']]) {
+    assert.match(detailTemplate, new RegExp(`<section class="dblock" id="blk-${id}"[^>]*>\\s*<h2[^>]*>${head}</h2>\\s*<div class="dbody" id="body-${id}"></div>\\s*</section>`));
+  }
+});
+
+test("the detail page's controls section is the main page's, character for character", () => {
+  const want = sectionText(template);
+  assert.ok(want && want.length > 500, 'the main template has its controls section');
+  assert.equal(sectionText(detailTemplate), want);
+});
+
+// The declarations of each rule of a stylesheet, by selector (comments removed; no at-rules in these files).
+function cssRules(css) {
+  const rules = new Map();
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const decls = {};
+    for (const d of m[2].split(';').map(x => x.trim()).filter(Boolean)) {
+      const at = d.indexOf(':');
+      decls[d.slice(0, at).trim()] = d.slice(at + 1).trim();
+    }
+    rules.set(m[1].trim(), decls);
+  }
+  return rules;
+}
+const px = (v) => { const m = /^(\d+(?:\.\d+)?)px$/.exec(v || ''); return m ? Number(m[1]) : NaN; };
+
+test('detail.css: text at least 12 px (16 px body, 12 px subscripts), the back link and the figure column keep their look, the sliders sit under the figure', () => {
+  const rules = cssRules(detailCss);
+  const rule = (sel) => { assert.ok(rules.has(sel), `no ${sel} rule`); return rules.get(sel); };
+  // the back link: a visible link at rest, with a different look on hover, active and keyboard focus
+  const back = rule('#back-link');
+  assert.equal(back.display, 'inline-block');
+  assert.equal(back['text-decoration'], 'underline');
+  assert.ok(px(back['font-size']) >= 12, 'the back link text is at least 12 px');
+  assert.ok(rule('#back-link:hover').background && rule('#back-link:hover').color);
+  assert.ok(rule('#back-link:active').background);
+  assert.match(rule('#back-link:focus-visible').outline, /^\d+px solid /, 'keyboard focus draws an outline');
+  // the sliders: in the figure's 740 px column, centred, close under the figure
+  const controls = rule('#controls');
+  assert.equal(controls['max-width'], '740px');
+  assert.equal(controls.margin, '6px auto 0');
+  // the calculation text: 16 px, airy enough to read
+  const body = rule('.dbody');
+  assert.equal(px(body['font-size']), 16);
+  assert.ok(Number(body['line-height']) >= 1.4, 'the calculation line height is at least 1.4');
+  assert.ok(px(rule('.dblock h2')['font-size']) >= 16, 'a block heading is at least 16 px');
+  assert.equal(rule('.dblock').margin, '20px 0 0');
+  assert.match(rule('.dblock')['border-top'], /^1px solid /, 'a rule separates the blocks');
+  // the top item stays compact: heading at least 16 px with tight margins (so the figure and sliders fit 700 px)
+  assert.ok(px(rule('#actual h2')['font-size']) >= 16);
+  assert.equal(rule('#actual h2').margin, '4px 0 2px');
+  // set-up lines are plain; plug-in lines carry the green border and tint and wrap long lines; notes are italic
+  assert.equal(rule('.dbody .step')['border-left'], undefined);
+  const plug = rule('.dbody .plug');
+  assert.match(plug['border-left'], /^3px solid /);
+  assert.ok(plug.background, 'a plug-in line has a tint');
+  assert.equal(plug['overflow-wrap'], 'break-word');
+  assert.equal(rule('.dbody .note')['font-style'], 'italic');
+  const rnd = rule('.dbody .rnd');
+  assert.ok(px(rnd['font-size']) >= 12, 'the unrounded note is at least 12 px');
+  assert.equal(rnd['font-style'], 'normal');
+  // variables: serif italic; a subscript is at least 12 px and never makes its line taller
+  const v = rule('i.v');
+  assert.match(v['font-family'], /serif/);
+  assert.equal(v['font-style'], 'italic');
+  const sub = rule('.dbody sub');
+  assert.ok(px(sub['font-size']) >= 12, 'a subscript is a fixed size of at least 12 px');
+  assert.equal(sub['line-height'], '0');
+  assert.equal(sub['vertical-align'], 'baseline');
+  assert.equal(sub.position, 'relative');
+  assert.equal(sub.top, '.3em', 'the subscript is lowered by a relative offset');
+});
+
+test('detail.css: block spacing, a heading style, and hover, active and focus-visible states for the back link', () => {
+  const bare = detailCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(bare, /\.dblock \{[^}]*margin/);
+  assert.match(bare, /\.dblock h2 \{[^}]*font-size/);
+  for (const sel of ['#back-link', '#back-link:hover', '#back-link:active', '#back-link:focus-visible']) {
+    assert.ok(bare.includes(`${sel} {`), `no ${sel} rule`);
+  }
+  assert.ok(!/@media|@supports/.test(bare), 'the detail stylesheet adds no at-rules');
+  assert.ok(!/https?:\/\//.test(bare));
 });

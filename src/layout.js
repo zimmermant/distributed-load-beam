@@ -37,7 +37,7 @@ export function columnCard(k) {
 }
 
 // One arrow of length len pointing at the beam from the side the sign says.
-function layoutArrow(x, signed, len, beamY) {
+export function layoutArrow(x, signed, len, beamY) {
   const yHead = signed > 0 ? beamY : beamY + BEAM_H;
   const yTail = signed > 0 ? yHead - len : yHead + len;
   return { x, yTail, yHead };

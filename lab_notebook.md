@@ -1,5 +1,298 @@
 # Lab Notebook
 
+## 2026-10-21 - Detail page: final whole-branch review and one wording correction
+
+### Summary
+The whole-branch review (most capable model, 18 commits, head 5b8ae45) found the branch ready to merge: 0 Critical, 1 Important, 5 Minor. It hand-derived 13 worked states, scanned all 13,122 states' calculation lines (no -0, NaN, bare number, plain-space number-unit pair or digit in a set-up line), and confirmed link text only reaches the page through textContent and that the main page changed only by the link and the spacing retune.
+
+### Decisions made
+- The Important finding was documentation drift: the "From the link" note appears on every hop between the pages (it names the values the link carried; Adjusted/Ignored are added when needed), while the README and spec call 9 said "only when adjusted or ignored". I kept the behaviour (it is the main page's existing describePresets text; changing it would alter hand-written preset links and need a 53-minute mutation re-run) and corrected the README and spec wording. If it proves noisy, the fix is one line in describePresets.
+- Not fixed here, listed as optional follow-ups: "tall end" wording for a negative triangle; no aria-live on the detail page (twenty lines re-announced per slider step would be worse); the figure's aria-label reads w_A as "w underscore A"; the 250 KB check counts UTF-16 units, not bytes (pre-existing).
+
+### Problems encountered
+None new. The reviewer asked whether docs/ and this notebook are published: they are tracked in the working repo but the public repository is a separately filtered copy of dist/, README and the license files, so they never ship.
+
+### Open questions / next steps
+- Merge feat/detail-page into main and republish (both dist files, new commit on the public history, no force-push) only on Todd's explicit go-ahead.
+
+Source: docs/superpowers/specs/2026-10-21-detail-page-design.md, docs/superpowers/sdd-ledger-detail-page.md
+
+## 2026-10-21 - Detail page, task 11: documentation and final check (feature complete on feat/detail-page)
+
+### Summary
+The detailed-calculation page is built, tested and documented on branch `feat/detail-page`; nothing is merged or published. **What exists now:** a second single-file page, `dist/distributed_load_beam_detail.html` (62,570 bytes; the main page is 44,053 bytes; each limit 250 KB), reached from a new link "More detailed calculation" at the bottom of the main page's "How each force is calculated" box ("Back to the simulation" returns). Top item "Actual load on AB": the beam figure with the net load outline and two labels w_A and w_B that move up and down with the sliders, the same sliders underneath. Then "Calculating the rectangular loading", "...triangular loading" and "...combined loading": symbols first (no digit in any set-up line), numbers only in the plug-in lines, ending with the torque equation about A that gives r_equiv. Slider values travel in the link (`?r=...&t=...&peak=A|B`, the existing preset parser and the "From the link" note); the pages never share live state. Seven new modules (`link.js`, `detail-layout.js`, `detail-scene.js`, `detail-math.js`, `detail-app.js`, plus `detail.template.html` and `detail.css`); `build.js` now writes both pages from one run with a module list per page. **Final numbers:** suite 293 tests, all pass; mutation audit 927 rows, all caught, all 293 tests fail under at least one (`docs/superpowers/mutation-audit-report.md`, raw output in `docs/superpowers/mutation-coverage-run.txt`); a fresh `node build.js` leaves both dist files byte-identical to the committed ones; the controller's browser harnesses (`tools/browser-harness.js` main page, `tools/detail-harness.js` second page) were clean at 800x750, 1280x720 and 1000x700. This task changed only documentation: README (the second page, both files published together, an example link, the two-page build, the page-2 harness, totals), the spec's status line (now IMPLEMENTED, pending merge/publication approval), the SDD ledger copied to `docs/superpowers/sdd-ledger-detail-page.md`, and this entry. The README's stale "about 37 KB" for the main page became "about 43 KB".
+
+### Decisions made
+The spec's numbered "Calls I made" (all kept as written; Todd can still change any): (1) a second file with the values carried in the link rather than one page with a hidden section; (2) the figure shows the net load (trapezoid), the rectangle and triangle are separated in the blocks; (3) labels at the sides with dotted leaders, clamped away from the beam; (4) no separate "given/split" block, each block defines its own w_rect or w_tri from w_A and w_B; (5) headings, page title and back-link wording as in the spec; (6) the unitless numerals 1/2, 1/3, 2/3 are the only ones and set-up lines have no digit; (7) subscripts at least 12 px (labels 20 units, subscripts 16 units); (8) no live synchronisation between the pages; (9) the "From the link" note also appears on the second page; (10) torque about A, downward forces positive; (11) the exact-values note rule of the main page carries over to the plug-in step for r_equiv; (12) making room for the link may change the main page's pinned CSS, its acceptance bar not stricter. Other decisions of the build: `styles.css` stays shared by both pages (the detail file carries a few unused `.more` rules, about 0.6 KB); 518 new mutation rows accepted instead of pruning (about 53 minutes for a full run); in the README the iframe note says only that the second page scrolls (its top item fits 800x750), because the main-page iframe logic of "everything visible" does not apply; the README example links for the second page use the same public base address as the existing examples.
+
+### Problems encountered
+- **Main page retune after the link line.** The link added about 20 px to the calculation panel; at 1280x720 the eight "couple" states (r = +-100, t = -+200) came to a page height of 729 px against a 720 px window. Fixed (commit 0ef7850) by `#calc` line-height 1.3 to 1.25, `.cl` margin 4 to 2 px and `.more` margin 3 to 2 px; re-measured over 176 states: 800x750 and 1280x720 all fit, at 1000x700 the couple states scroll (allowed: the controls stay pinned). The acceptance bar was not loosened.
+- **Harness centre tolerance calibration.** The second page's label check first allowed 6 units between a label's painted centre and its y; measured in the browser the painted centre is +1.2 units from y with `dominant-baseline: central` and -5.6 without it, so 6 accepted both. Tightened to 2 and two sensitivity plants added (label without the baseline, label y shifted +3).
+- **The zero-height label face rule.** With a zero height next to a negative one, the first geometry put the corner dot on the top face while the outline used the bottom face (found by a grid test over 13,122 states). Fixed in the geometry: a zero height's edge point is on the face the outline uses (bottom when w_A + w_B < 0, else top).
+- **Mutation audit growth.** Rows went from 409 to 927 and tests from 193 to 293; the first run of the new rows had 51 survivors, all missing tests (the detail.css rules, one-sided outline splits, the -0 guard at B, leader ends away from horizontal, and others), so 8 tests were added; 23 old rows needed their own `{ max: N }` because the second page now exercises the same shared code; three candidate rows were dropped as equivalent mutants.
+
+### Open questions / next steps
+- **Merge and publish only on Todd's go-ahead.** Merge `feat/detail-page` into `main` with `--no-ff`; then publish as a new commit on top of the public history, as for the earlier features. **The public repo needs BOTH `dist/` files** (`distributed_load_beam.html` and `distributed_load_beam_detail.html`), because the pages link to each other by relative file name; the root `index.html` redirect still points at the main page. Nothing under `docs/` is published.
+- A whole-branch final review is still to be done by the controller before merge.
+- Not tried: Firefox and Safari (harnesses measured in Chromium only), and the pages inside a real LMS frame.
+- Source: docs/superpowers/specs/2026-10-21-detail-page-design.md, docs/superpowers/plans/2026-10-21-detail-page.md, docs/superpowers/sdd-ledger-detail-page.md, docs/superpowers/mutation-audit-report.md, README.md.
+
+## 2026-10-21 - Detail page, task 10: mutation audit for the second page
+
+### Summary
+`tools/mutations.mjs` went from 409 rows / 193 tests to **927 rows / 293 tests**; the final full run (`--coverage --strict`, 53 minutes) caught every row and made every one of the 293 tests fail at least once (raw output in `docs/superpowers/mutation-coverage-run.txt`, narrative and per-file table in `docs/superpowers/mutation-audit-report.md`). 518 rows were added: link.js 9, detail-layout.js 87, detail-scene.js 81, detail-math.js 172, detail-app.js 45, detail.template.html 38, detail.css 30, build.js 34 (the two-page loop), app.js 4, index.template.html 7, styles.css 9 (the main page's link), and 2 on the minus-zero guard inside `test/detail-math.test.js`. The audit found no defect in `src`; it found 8 missing tests, which were added (suite 285 to 293). The tool gained `--only=TEXT`, `--from=N` and `--dry` for working on rows.
+
+### Decisions made
+- Every new function and branch got rows, so the count is far above the 70 to 110 the brief guessed; many rows are one wording or one operand each. Prune in review if too many; the run needs about 3 s per row.
+- 23 existing rows (loadAt, fmt hyphens, state, presets, panel units, scene text class, svg text content, six build rows) exceeded the 12-test limit once the detail tests were added, because the second page uses the same code. Each got an own `{ max: N }` (about 30 % above the measured count) instead of being narrowed, and a comment in the tool says why; 13 new rows carry one too.
+- Three candidate rows were dropped as equivalent mutants (an arrow of exactly `minArrow`, a label exactly `labelClear` from the beam middle: neither value is reachable from the 5 N/m grid; the triangle location with `fmt` for `fmtFixed`: 1.33 and 0.67 print the same). Noted in the tool and the report.
+- A test with no mutation to fail got a real row where one exists (an export left in `detail-app.js`, `detail-math.js`, `detail-scene.js`; `getElementById` replaced by `querySelector`); the detail-math test's own minus-zero regexp is mutated in place (`test/detail-math.test.js` rows, same form as `test/unit-rule.js`).
+- The `export` keywords added to scene.js, panel.js and layout.js have no row: they change no behaviour.
+
+### Problems encountered
+- First run of the new rows: 51 survivors and 14 over-limit rows. All survivors were missing tests: `detail.css` had no behavioural test (26 rows) and now has a rule-parsing test; the outline split was tested only at the symmetric zero crossing; the `-0` guard at B; leader and dot ends were tested only where the leader is horizontal; the `rnd` class and negative operands of the r_equiv numerator; link values re-applied at every draw; the figure column and `aria-labelledby`; `.more` underline and width; the build's stylesheet-order test passed by accident (a comment in detail.css mentions `#from-link`), page names in errors, import/export checks on the detail page.
+- Four tests had no mutation after the second run (three placeholder-export checks and the minus-zero guard's self-test): rows added, third full run clean.
+- Running two mutation runs at once on this machine slowed both (about 6 s a row); one at a time is 3.3 s.
+
+### Open questions / next steps
+- None for the audit. The controller's browser look at the second page is still the acceptance check; nothing in this task could be checked in a browser.
+- Source: docs/superpowers/mutation-audit-report.md, docs/superpowers/mutation-coverage-run.txt, docs/superpowers/specs/2026-10-21-detail-page-design.md, docs/superpowers/plans/2026-10-21-detail-page.md (Task 10).
+
+## 2026-10-21 - Detail page, task 9b: cleanup batch from the task reviews (harness tolerance, grid checks, pins)
+
+### Summary
+Tests, harness and comments only; no behaviour change (the two dists changed only because CSS comments are inlined: the stylesheet comment edits move the bytes, the page does not change). Harness (`tools/detail-harness.js`): painted-centre tolerance tightened from 6 to 2 units (measured in Chromium: painted centre minus y is +1.2 with `dominant-baseline: central`, -5.6 without); two new sensitivity plants (first label stripped of `dominant-baseline`, must be named by the painted-centre check; first label's y shifted +3, must be named by the label-y check; both carry a `data-probe` PROBE7/PROBE8 name in the message and are undone in `finally`); sweep outline and arrow totals asserted exactly (212, 1146) instead of floors; `sensitivity()` now surfaces drive problems from `restore()` and includes them in `flagged`. Tests: minus-zero guard fixed and given its own test; the grid test for derive-vs-printed gained w_A/w_B, F_equiv operands and r_equiv terms plus the honesty property; detail-app asserts the figure text after the t move and the peak click; detail-scene asserts `dominant-baseline` central and compares full tree signatures for idempotence; detail-layout arrow test renamed and made exact, comments tidied; detail-units lints for ASCII hyphen-minus before a digit and for 'N per m' / 'N·m'; template test pins the `.more` rule. CSS: `.more` comment corrected to 13 px x 1.3 = 16.9 px; dead `#from-link` rule and no-op `.dbody .setup` colour removed from detail.css. Suite: 285 pass.
+
+### Decisions made
+- Painted-centre tolerance 2 sits between +1.2 and -5.6, so it passes the correct drawing and catches loss of `central`. The plants name themselves through a `data-probe` attribute that `checkFigure` prints into the label messages, because the label messages otherwise do not carry any planted text.
+- Exact sweep totals (212 outlines, 1146 arrows) change only when the geometry rules in `src/detail-layout.js` change; the harness comment says so.
+- Item 5: the old guard in the file actually ended in a no-break space character (invisible in the listing), so it did match `−0 N`; it was still replaced as asked by `/−0(\.0+)?(?![0-9.])/` (independent of the following character, also flags `−0` at the end of a line) and a small test now pins that it flags `−0 N`, `−0.00 m`, `(−0 N)` and ignores `−0.5`, `−0.05`, `−10`, `−100`.
+- Item 6 compares against `derive(s)`: w_A, w_B from derive's forces (zero-end height F_rect / L, tall end that plus 2 F_tri / L); the F_equiv operands and sum; the five numbers in the r_equiv numerator line (forces against derive, locations against derive's x where it is not null); the printed r_equiv against derive's x to 0.005; and the honesty property: the printed terms worked as printed round to the printed result exactly when the line carries no unrounded note (both directions asserted; counts asserted).
+- Item 9: the "match the main page top figure's rule" test never compared with the main page; it now says what it asserts (one arrow per eighth of AB, length |w| x scale, omitted under minArrow), checked exactly on a sample of the grid, and the unused `loadShapes` import is gone.
+- Item 10: the hyphen and wording lint run inside the shared `lint()` so they cover the figure, every block line, the link notes, the template strings and the booted page; the echo of a rejected link value is replaced by ECHO first as for the unit rule. Item 12: `.dbody .setup { color: #111827 }` equals the body's colour; computed styles of every `.setup` line and of `#from-link` (hidden and shown) were compared before and after in headless Edge and are identical.
+- The line numbers in the task brief did not match the files (the files are shorter); each item was located by content.
+
+### Problems encountered
+- Headless Edge hung once while a stale profile was still locked; killed the processes and used a fresh profile directory.
+- A `git checkout src/styles.css` used to undo a scratch mutation also undid the uncommitted comment fix; the fix was redone. Lesson: undo scratch mutations on a copy, not with checkout, when the file has real uncommitted edits.
+
+### Teeth proof (scratch copies, all reverted)
+- Harness, in headless Edge on the built page at 800x750, 1280x720 and 1000x700: 176 states, 0 violations, outlines 212, arrows 1146, `flagged: true` with `centreCaught` and `yCaught` true, budget ok. With the tolerance set back to 6 the stripped-`central` plant is not caught (`centreCaught: false`, `flagged: false`); with the y tolerance at 5 the +3 plant is not caught; a page with `central` removed gives 352 painted-centre violations (about -5.3 units off); an expected arrow total of 1145 gives one violation naming the count.
+- detail-math grid test: swapped w_A/w_B in the plug line, swapped F_equiv operands, shifted an r_equiv term by 0.01 m, and the unrounded note forced off each fail test 17. detail-app: figure redraw skipped when t is not 100, or when the peak is A, fails the test. detail-scene: removing `central` fails the labels test; a render that leaves a state-dependent attribute behind fails the idempotence test while the node count is unchanged. detail-layout: raising the arrow cutoff by 1 unit fails the new arrow test. detail-units: an ASCII hyphen in a label value (6480 hits), 'N per m' in a label (13122 hits) and 'N·m' in a note (162 hits) each fail, as do the rule's own self-checks on known strings. template: changing `.more` line-height fails the pin.
+
+### Open questions / next steps
+- The controller re-runs H.all at three sizes in the Browser pane (it ran here only in headless Chromium/Edge; Firefox and Safari text boxes are not checked).
+- Source: spec docs/superpowers/specs/2026-10-21-detail-page-design.md; plan docs/superpowers/plans/2026-10-21-detail-page.md; reviews of tasks 3 to 9; harness tools/detail-harness.js.
+
+## 2026-10-21 - Detail page, task 9: browser harness for the second page
+
+### Summary
+New `tools/detail-harness.js`, modelled on `tools/browser-harness.js`: an IIFE that defines `H` with `install`, `sweep`, `sensitivity`, `budget`, `all` (plus `checkFigure` and `expected`). Not in any build module list, not run by `node --test` (it needs a layout engine); `node --check` passes and `dist/` is byte-identical after a rebuild. `sweep` drives the real sliders (`input` events) and peak buttons over the 9x9 grid x both peaks plus the 7 near-cancel pairs (176 states) and checks, per state: the two height labels and the caption inside the 960x356 viewBox and disjoint (0.5 tolerance in x and y) from beam, wall, hatching, outline, arrows, leaders, dots, pin circles, the dimension line, the A/B/C marks and each other; the labels' y, x, text, leader ends and dots against an independent recomputation of w_A, w_B, edge y and label y; rendered font size >= 12 px for every text and tspan; computed font size >= 12 px for every block line, every element in the three bodies and every `sub`; no horizontal scroll. `sensitivity` plants six faults and requires each named; `budget` checks heading, back link, "Actual load on AB" heading, figure and controls fully visible with no scrolling.
+
+### Decisions made
+- Boxes come from `getBoundingClientRect` converted to viewBox units through `getScreenCTM`, not `getBBox`: for `dominant-baseline: central` text and text with tspans `getBBox` differs between engines; the client rect is what is painted. Every element is measured the same way.
+- Label y is recomputed from the slider values with the constants and rule copied from `src/detail-layout.js` (peak B: w_A = r, w_B = r + t; peak A: the reverse; edge y; the zero-height face rule; mid-line +/- labelClear). The label's painted vertical centre is also held within 6 units of its y (looser, because engines place a central baseline slightly differently).
+- Font sizes use the computed style times the SVG's screen scale, so an inherited or CSS-overridden size is seen, not just the attribute.
+- Non-vacuity floors: exactly 3 `text.t`, 3 `text.tin`, beam/wall/hatching/pin/leader/dot counts per state; sweep totals of at least 180 outlines and 900 arrows (the layout draws 212 and 1146, computed in node), block lines >= 12, sub elements >= 6.
+
+### Problems encountered
+Run in headless Edge on the built page (a scratch copy with the harness injected, outside the repo; windows 800x750, 1280x720, 1000x700; the headless inner heights came out 666, 636, 616): sweep 176 states, 0 violations, min figure text 12.3 px, min block text 12 px, outlines 212, arrows 1146, budget ok at all three. First sensitivity run flagged two of the harness's own plants as uncaught: the label-overlap plant used `text-anchor: start` against a right-anchored label (no overlap), and the small-tspan plant's message did not carry the PROBE name. Both plants fixed; sensitivity then `flagged: true`. Mutation check on scratch copies of the built page (labelClear 20, subscript 12 units, labelADx 10, `.dbody sub` at 10 px) each produced hundreds of violations naming the fault. A node scratch script confirmed `H.expected` equals `detailLabels` (y, x, edge y, label text) for all 176 states.
+
+### Open questions / next steps
+- The controller's own run in the Browser pane at the three viewports is still the acceptance check; re-run `tools/browser-harness.js` on the main page (Task 7 changed its box).
+- The headless run is Chromium (Edge) only; Firefox/Safari engine differences in text boxes are not checked.
+- Source: spec docs/superpowers/specs/2026-10-21-detail-page-design.md; plan docs/superpowers/plans/2026-10-21-detail-page.md (Task 9); model harness tools/browser-harness.js.
+
+## 2026-10-21 - Detail page, task 8: unit and digit lint for the second page
+
+### Summary
+New `test/detail-units.test.js` reuses `test/unit-rule.js` unchanged (`bareNumbers`, `plainSpaceNumbers`). Over all 13,122 slider states (count asserted) it lints the figure's text nodes (A, B, C marks, the two w labels with their tspans concatenated, the caption), every set-up, plug-in and note line of the three blocks through `detailPlain`; over a table of 25 link queries the `describePresets` note (the literal echo of a rejected value replaced by ECHO, as in the main page's lint); the template's static text and its aria-label/title/placeholder attributes (including the back link text); the document title and the back link href. Every set-up line is checked for no ASCII digit and at least one variable name. A separate test shows the rule rejects "F = 200", accepts "F = 200 N" with U+00A0 and rejects it with a plain space. Whole suite: 283 pass; dist unchanged.
+
+### Decisions made
+- The back link href (`distributed_load_beam.html?r=100&t=100&peak=B`) is a URL, not text a reader sees, and its digits are the slider values, so the unit rule is not applied to it. Instead every state's href must match one strict form (ASCII hyphen-minus, whole numbers, A or B, no spaces or U+2212). Title, link text and the blocks the booted page writes are linted as text.
+- Per-line variable requirement is possible: every one of the 11 set-up lines (3 rect, 3 tri, 5 comb) names a variable, so it is enforced per line, not per block. Variables are matched in plain text as `F_rect` etc. (detailPlain writes a subscript as `_x`); `L` only as a standalone capital, `τ` as a substring (so `τ_equiv` counts; the combined block's torque lines have no other variable).
+- Allow-list: the fractions ½ ⅓ ⅔ only; the echo only in the link-note table.
+- stripEcho is copied from `test/units.test.js` rather than exported, to keep the main page's test file unchanged.
+
+### Problems encountered
+The figure has six text nodes per state, not three: the beam's A, B, C marks (from `sceneBeam`) as well as the two labels and the caption; the first draft asserted three. Only three of the six hold a number.
+
+### Teeth proof
+In a scratch copy, ten breaks, each failing the new file: plain space in `detailUnit` (calc test); unit dropped from the w_B label; plain space in the w_A label; digit added to a rect set-up line; set-up line without a variable; plain space in the caption; template scale label without unit; link note r without unit; back link keeping U+2212; digit in the document title. The scratch copy is deleted.
+
+### Open questions / next steps
+- Not verifiable here: nothing visual; this is a text lint only.
+- Source: spec docs/superpowers/specs/2026-10-21-detail-page-design.md; plan docs/superpowers/plans/2026-10-21-detail-page.md (Task 8).
+
+## 2026-10-21 - Detail page, task 7 fix round 1: room for the link at 1280x720
+
+### Summary
+The controller measured the link commit (e8aa19e) in a real browser: at 1280x720 the eight couple states (calc text about 490 chars) had document height 729 > 720 (calc panel 232 px, controls panel 203 px). Fix: `#calc` line-height 1.3 -> 1.25, `#calc .cl` margin-bottom 4px -> 2px, `.more` margin-top 3px -> 2px. Estimated recovery in the couple state: about 10 lines x 0.65 = 6.5 px, 3 gaps x 2 = 6 px, link line 0.65 px + 1 px margin, so roughly 14 px (232 -> about 218 px, document about 715). Template test pins and the three mutation rows (line height loosened, text shrunk, lines spaced apart again) updated to the new values; each of those mutations still makes the suite fail. Text stays 13 px.
+
+### Decisions made
+- Did not change the `1.1fr 1fr` ratio: the controls column must keep at least 376 px (two peak buttons), so the calc column could gain only about 6 px of width, an uncertain saving of a line.
+- Did not touch paddings (already 4 px) so 800x750 and 1000x700 only get shorter, never taller.
+
+### Problems encountered
+Cannot measure without a browser; the controller re-measures all states at the three viewports. Full mutation run (409 rows) takes longer than ten minutes; only the three retuned rows were re-run by hand against the new values.
+
+### Open questions / next steps
+- If a state still overflows by a few px, next levers: `.calc-panel` padding 4 -> 3 px, `h2` margin 2 -> 1 px.
+
+## 2026-10-21 - Detail page, task 7: the link on the main page
+
+### Summary
+The main page's "How each force is calculated" box now ends with `<a id="detail-link" class="more" href="distributed_load_beam_detail.html">More detailed calculation</a>`, placed after the (empty, aria-live) `#calc` div and not inside it, so the text rewrites of `#calc` never remove it or its keyboard focus. `src/app.js` looks the element up by id once and, at the end of `sync()` (which also runs once at boot), sets its `href` to `DETAIL_PAGE + presetQuery(s)`: default state gives `distributed_load_beam_detail.html?r=100&t=100&peak=B`, and the href follows every slider input, peak click and link preset. `src/styles.css` gained `.more` (13 px, the calculation text's size, underlined blue link) with hover (darker text, light blue fill), active (darker fill) and `:focus-visible` (3 px outline) states. New tests: template (link text, order after `#calc`, panel membership, state rules, size >= 12 px) and app (boot href, follows slider/peak, follows link presets, not under `#calc`). `test/app.test.js` stub page gained the `detail-link` element (legitimate: boot asserts every looked-up id exists in the stub).
+
+### Decisions made
+- No retune of the main page's pinned CSS in this task: the controller measures the acceptance bar after the commit and sends a separate retune with measured numbers if the added line breaks it. The link is as compact as reasonable: `display: block; width: fit-content; margin: 3px 0 0; padding: 0 2px; font-size: 13px; line-height: 1.3`. Vertical space added to the calc panel: 3 px margin + one 13 px x 1.3 = 16.9 px line = 19.9 px (no padding, borders or other margins).
+- `display: block; width: fit-content` rather than inline-block, so the line box is exactly the link's 16.9 px and not stretched by the parent's 16 px strut.
+- 13 px text, not 16 px: it matches the panel's body text and keeps the added height small; still above the 12 px floor.
+
+### Problems encountered
+RED first (3 failing: the two app tests and the template test), then GREEN (275 pass). The detail page's dist also changed (7 inserted CSS lines): both pages inline `src/styles.css`, so the `.more` rules appear in the detail page too, unused there (no element has class `more`). Same situation as the existing `#calc` rules. Not avoidable without splitting a main-only stylesheet; left as is.
+
+### Open questions / next steps
+- Not seen in a browser: the controller must measure the main page's bar (default and probe states at 800x750, 1280x720, 1000x700; sticky row not covering the figure; tallest calculation text plus link no taller than the controls panel) and the link's hover/active/focus looks.
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md ("The pages and how they connect")
+
+## 2026-10-21 - Detail page, task 6: the second page is wired
+
+### Summary
+`src/detail-app.js` now boots the detailed-calculation page, modelled on `src/app.js`: looks every element up by id once, creates the state, `createDetailScene`, the shared `createControls`, applies the link's presets once before the first render (only the fields the link set), writes the "From the link" note with `textContent` only and hides it when empty. `sync()` redraws the figure, rewrites each of the three `#body-...` blocks (setup lines `<div class="step setup">`, plug lines `<div class="plug">`, notes `<div class="note">`, all from `detailBlocks`) only when that block's HTML actually changed, sets `#back-link` `href` to `MAIN_PAGE + presetQuery(s)`, and renders the controls. The page title is set. `src/detail.css` gained the math look: `i.v` serif italic, `sub` 12 px with zero line-height and a relative offset (no taller lines), `.plug` with a green left border and faint tint, `.note` italic, `span.rnd` small muted, and a compact "Actual load on AB" heading. No at-rule was added, so the Task 2 "no at-rules" test stands. New `test/detail-app.test.js` (9 tests, stub page): title, defaults, `?r=100&t=-190&peak=B` (note text, blocks equal `detailBlocks`, back link `distributed_load_beam.html?r=100&t=-190&peak=B`, each body written once at boot), re-render on slider and peak button, a body untouched when its text is unchanged, no markup from link text, the off-grid link `?r=7&t=abc&peak=c`, and no leftover placeholder export.
+
+### Decisions made
+- Body HTML is cached per block key in `shown` and compared as a string, so moving the triangular slider does not rewrite the rectangle block (it depends on r and the peak only).
+- `sub` keeps the line height by `line-height: 0` plus `position: relative; top: .3em` instead of `vertical-align: sub`, which pushes line boxes apart.
+- The r_equiv plug line wraps at its spaces (normal wrapping; numbers and units are joined by no-break spaces already); `overflow-wrap: break-word` is only a last resort for a very narrow window.
+- Stacked fraction not used; the slash form from `detailBlocks` is kept.
+
+### Problems encountered
+RED first (6 of 9 failed against the placeholder). One test helper bug: a figure label is a `text` with `tspan` children, so the helper joins the children's text.
+
+### Open questions / next steps
+- Not seen in a browser: the controller must check the layout (top item at 800x750, 1280x720 and 1000x700, no horizontal scroll, long r_equiv line wrapping, subscript line heights, link states).
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md, mockup: docs/superpowers/specs/2026-10-21-detail-page-mockup.html
+
+## 2026-10-21 - Detail page, task 5: the three calculation blocks as pure text
+
+### Summary
+`src/detail-math.js` now holds the detail page's calculation text, with no DOM: `detailPlain(html)` (tags stripped, `<sub>x</sub>` becomes `_x`) and `detailBlocks(s)`, which derives with `derive(s)` and returns the three blocks (rect, tri, comb) as `{ key, title, setup, plug, notes }`, each field an array of HTML strings. Variables are `<i class="v">F</i><sub>rect</sub>`. Numbers come only from `fmt`/`fmtFixed`; negative operands use `panelPar`; the r_equiv line ends with `panelWhere(x)` and, when `panelNeedsExact` says so, the "(worked from the unrounded locations)" note. `panel.js` only gained `export` on `panelPar`, `panelWhere`, `panelNeedsExact` (main dist byte-identical, 42,833 bytes). The placeholder `DETAIL_MATH_READY` is removed. New `test/detail-math.test.js` (18 tests; the grid tests assert 81 x 81 x 2 = 13,122 states): exact contract strings for the default and peak-A states, the negative, r = 0, t = 0, couple, no-load and off-the-beam branches, and grid properties (no digit in any set-up line, plug values equal `derive(s)` to the printed precision, unit lint `bareNumbers`/`plainSpaceNumbers`, variable names in the right blocks, notes exactly for zero parts and the couple). Suite 263 of 263 pass; detail dist rebuilt (58,204 bytes).
+
+### Decisions made
+- A part with no force has `x = null` in `derive`, but its location is geometric (r_rect = 1.00 m, r_tri = 1.33 or 0.67 m), so the plug lines print it ("rect.plug as usual") and `panelNeedsExact` gets a copy of `d` with those locations filled in. Passing `d` as is would give NaN and a false "unrounded" note (the main page avoids it by branching first).
+- With one zero part the r_equiv line is the full formula (for example `1.00 m · 0 N + 1.33 m · 100 N`), not the main page's "only the triangle acts" sentence; the part's note says it adds no torque.
+- Couple: the values line keeps all four values and the block stops after the F_equiv line, then the couple note. No load: the values line holds only the two forces (no locations), then the F_equiv line, then the no-load note; the rect and tri blocks each carry their "no ... load" note too.
+- The notes' "0 N" uses a no-break space like every other number.
+- Order after the r_equiv result: `panelWhere` text, then the unrounded note (as on the main page, the note in a `span class="rnd"`).
+
+### Problems encountered
+RED first (no `detailBlocks` export). Nothing else; the grid tests pass first time.
+
+### Open questions / next steps
+- Task 6 will render these arrays; the `i.v` and `span.rnd` styles are still to be defined in detail.css.
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md (sections 2 to 4)
+
+## 2026-10-21 - Detail page, task 4: detail figure renderer
+
+### Summary
+`src/detail-scene.js` now draws the detail page's figure: `createDetailScene(svg)` returns `{ render(s) }`, which clears and redraws from `s` alone. Draw order: net outline polygons (class `g`, ink, width 2, fill ink at 0.1), net arrows (`sceneArrow`, width 1.4, ink), the two dotted green leaders (class `g leader`, `3 3`), the beam copy (`sceneBeam(svg, DETAIL.x0, DETAIL.beamY, DETAIL.px)`, after the leaders so the wall covers a leader that crosses it), the corner dots (class `g dot`, r 3.5) at each label's `edge`, the two labels, then the AB dimension line and the caption `AB: L = 2 m (loaded)` (NBSP between 2 and m). A label is one SVG `text` (class `t`, 20 units, bold, green, anchor from `detailLabels`) holding `w`, a subscript `tspan` (16 units, dy 5) and a value `tspan` (20 units, dy -5, text ` = 100 N/m` with NBSP before the unit). The placeholder export `DETAIL_SCENE_READY` is removed. `scene.js` only gained `export` on `sceneBeam`, `sceneText`, `sceneArrow`; the main page's built output is byte-identical (42,833 bytes). `test/stub-dom.js` needed no change (tspans are ordinary children). New `test/detail-scene.test.js` (14 tests, including the 13,122-state grid); suite 245 of 245 pass. Detail dist rebuilt (51,278 bytes).
+
+### Decisions made
+- Labels carry `dominant-baseline="central"` so the label's y (which is where its leader ends and what `detailLabels` clamps) is the text's vertical centre, as the Task 3 label-box tests assume, not its baseline. Not yet seen in a browser.
+- Outline paths use plain class `g` (as the brief says); tests tell them from other nodes by tag (`path` directly under the svg).
+- The dimension line is one group of three lines (class `g`), like the main page's, so the "groups with class g" count is 8 arrows + 1 dimension group.
+
+### Problems encountered
+RED first (`createDetailScene` not exported). One test of mine had a wrong expectation (default w_B is 200 N/m: rectangle 100 plus triangle peaking at 100 on B); fixed the test, not the code.
+
+### Open questions / next steps
+- Browser look: label vertical centring (`dominant-baseline`), tspan baseline shift, anchoring of the right-aligned label with tspans, and halo on the subscript.
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md (section "1. Actual load on AB")
+
+## 2026-10-21 - Detail page, task 3 fix: a zero height's label anchors on the outline's face
+
+### Summary
+`detailLabels` now puts a zero height's `edge` point (the corner dot and the leader's end) on the face the outline uses: the bottom face (y 174) when w_A + w_B < 0, the top face (y 150) otherwise (including both zero). `detailEdgeY(0)` is unchanged (top face; it is a function of one height). The label y is the clamp of that edge as before, so w_A = 0 next to a negative w_B puts the a-label at mid + 40 = 202 and a zero end next to a positive height still goes to mid - 40 = 122. This supersedes the "edge of a zero height is on the top face" decision and the open question in the Task 3 entry below. New tests: the four zero-end cases and both-zero, plus a grid property (13,122 states, count asserted) that every label's edge point is a vertex of `detailOutline(s)`. The monotonic test now compares height groups (a tie at height 0 can carry two label y values, depending on the other end). Suite 231 of 231 pass; detail dist rebuilt (48,143 bytes), main dist unchanged.
+
+### Decisions made
+- Fix in the geometry (not the scene) so the dot is always on the drawn outline, as the controller ruled.
+
+### Problems encountered
+RED first: the grid test failed at {r:-200,t:200,peak:A} (edge 250,150 not on the outline: the triangle is below the beam).
+
+### Open questions / next steps
+- Browser look at the figure comes with Task 4.
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md (section "1. Actual load on AB")
+
+## 2026-10-21 - Detail page, task 3: detail figure geometry
+
+### Summary
+`src/detail-layout.js` now holds the pure geometry of the detail page's figure (no DOM): `DETAIL` (constants), `detailX`, `detailHeights` (w_A, w_B, never -0), `detailEdgeY`, `detailOutline` (one polygon for same-sign heights, two triangles split at the zero crossing for opposite signs, none when both are 0), `detailArrows` (the main page's 8-arrow rule at the detail scale) and `detailLabels` (the w_A and w_B labels, their anchors, corners and dotted leaders). The placeholder export `DETAIL_LAYOUT_READY` is removed. `layoutArrow` in `src/layout.js` is now exported (it is reused, not copied); the main page's built output is byte-identical (42,833 bytes). New `test/detail-layout.test.js` (18 tests); suite 229 of 229 pass. `dist/distributed_load_beam_detail.html` rebuilt (47,820 bytes).
+
+### Decisions made
+- Label rule: the label sits on the edge y, except when the edge is within `labelClear` (40) of the beam's middle; then it is held at middle - 40 (edge at or above the middle, which includes height 0) or middle + 40 (edge below it). This is a non-increasing function of the height, so the labels move up as the sliders raise the heights and jump (never wander) across the beam.
+- A height of exactly 0 has its edge on the beam's top face (`detailEdgeY(0)` = beamY), so its label is held above the beam. The outline of a zero end still sits on the face the other end's load uses (a zero end gives a triangle, with no repeated point).
+- Property tests run over the whole slider grid (81 x 81 x 2 = 13,122 states) and assert their counts; the "monotonic" test sorts the grid by w_A (then by w_B) and requires the label y never to increase (controller ruling).
+
+### Problems encountered
+None. RED first (the module did not export `DETAIL` etc.), then green.
+
+### Open questions / next steps
+- When w_A (or w_B) is 0 and the other end is negative, the outline's triangle corner is on the bottom face, but the label's `edge` (and leader end) is on the top face by the brief's rule. Task 4 (the scene) may want to draw the corner dot at the outline's own vertex; not decided here.
+- Browser look at the figure comes with Task 4 (nothing draws these shapes yet).
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md (section "1. Actual load on AB"); mockup docs/superpowers/specs/2026-10-21-detail-page-mockup.html (draw())
+
+## 2026-10-21 - Detail page, task 2: two-page build and the page skeletons
+
+### Summary
+`build.js` now builds two pages from one run: `PAGES = [main, detail]`, each `{ name, out, template, css[], modules[] }`. `MODULES` is unchanged; new `DETAIL_MODULES` is the main list minus `app.js`, plus `detail-layout.js`, `detail-scene.js`, `detail-math.js`, `detail-app.js`. The new `dist/distributed_load_beam_detail.html` (43,801 bytes) is a skeleton: `src/detail.template.html` (title and h1 "Distributed load on a beam: detailed calculation", the back link, the hidden link note, section "Actual load on AB" with an empty `#detail-fig` and the main page's controls section copied character for character, then three empty calculation blocks `#blk-rect|tri|comb`), `src/detail.css` (back-link hover/active/focus-visible states, block spacing, heading style) and placeholder modules (`DETAIL_LAYOUT_READY`, `DETAIL_SCENE_READY`, `DETAIL_MATH_READY`; `detail-app.js` only sets the title). The main page's built output is byte-identical to the Task 1 build (42,833 bytes). Suite: 211 of 211 pass (199 before, plus new and reworked build and template tests).
+
+### Decisions made
+- Every build-time assertion (parse, no import/export left, no external URL/script/link, 250 KB) runs for each page; the duplicate-name scan uses a fresh map per page, so `appStart` in both app files is not a collision, while the same name twice in one list still fails.
+- All pages are built in memory first and written only after every one passes, so a failure in the detail page cannot leave a freshly written main page next to a stale or missing detail page.
+- Error messages now name the page ("Build failed (detail page)"); the existing tests match on the unchanged phrases.
+- The controls section is inside the "Actual load on AB" section (spec item 1 is "figure and sliders"); `#controls` is centred to 740 px in `detail.css` since the main page's `.side` wrapper is not used here.
+- The detail figure's aria-label contains no number without a unit (a test checks it).
+
+### Problems encountered
+None. RED first (build.test.js failed on the missing `DETAIL_MODULES` export; template.test.js on the missing template file), then green.
+
+### Open questions / next steps
+- Task 3 onward replace the placeholder exports (each task must remove its own); nothing wires the sliders or the figure on the detail page yet, so it cannot be looked at meaningfully in a browser (not opened here).
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md ("The pages and how they connect", "The second page, top to bottom")
+
+## 2026-10-21 - Detail page, task 1: link module
+
+### Summary
+New `src/link.js` (`MAIN_PAGE`, `DETAIL_PAGE`, `presetQuery`) and `test/link.test.js`. `presetQuery({r, t, peak})` returns the query string `?r=100&t=-100&peak=B` that the two pages will use to carry the slider state to each other; numbers are printed with `fmt` (as the sliders print them) with the true minus swapped for an ASCII hyphen-minus, so `-0` can never appear. `link.js` is listed in `MODULES` in `build.js` (between `presets.js` and `layout.js`) and `dist/distributed_load_beam.html` was rebuilt (42,833 bytes). Suite: 199 of 199 pass (193 before + 6 new).
+
+### Decisions made
+- Reuse `fmt` rather than a second number printer, so the link and the screen agree.
+- Round-trip test over the 81 x 81 x 2 grid asserts its count. The grid includes +-5 and +-10, which the sliders never hold (the zero zone snaps them to 0). So the test sends the snapped state (what a slider really holds) and requires it to come back identical with no notes, and also sends the raw grid value and requires the snapped value back, with a note exactly when snapping changed it. The brief's literal wording ("empty adjusted" for every grid point) cannot hold for +-5/+-10, because `parsePresets` correctly reports those as adjusted.
+
+### Problems encountered
+First draft of the round-trip test failed on `t=-10` (adjusted to 0); resolved as described above.
+
+### Open questions / next steps
+- Tasks 2 onward add the detail page; the main page does not use `presetQuery` yet (the link is Task 4+).
+- Spec: docs/superpowers/specs/2026-10-21-detail-page-design.md
+
+## 2026-10-21 - Republished: units on every number live (public commit c025043)
+
+### Summary
+The merged build (57fb527 here) is live at https://zimmermant.github.io/distributed-load-beam/ as public commit c025043, a normal fast-forward push (3f5c267..c025043) on top of the existing public history, with the guarded method recorded in the earlier republish entry. The live `dist/distributed_load_beam.html` is byte-identical to the local build. On the live page (800x750, example preset link) the browser harness is clean (176 combinations, 0 violations, text 12.3 px, all probes caught, budget ok), and a scan of everything shown (page text, SVG text, aria text) found 52 numbers, none without a unit and no plain-space number+unit pairs.
+
+### Decisions made
+- Same guarded method; pre-push checks on the public clone: 193 of 193 tests pass, its build is reproducible and identical to this repo's dist, zero local-path or secret-like hits in the tree, no `docs/` or tooling folders public.
+- This entry reaches the public copy with the next update.
+
+### Problems encountered
+None.
+
+### Open questions / next steps
+- Not yet tried inside a real Canvas iframe.
+
 ## 2026-10-21 - Merged: units on every number
 
 ### Summary

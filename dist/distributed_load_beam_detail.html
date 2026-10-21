@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distributed load on a beam: detailed calculation</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 6px 16px 6px;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #111827;
+  background: #ffffff;
+}
+h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 600; }
+h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
+
+/* ---- page layout -------------------------------------------------------
+   One column at every width, at most 740 px wide and centred when the window is wider (.page holds
+   the title, the link note, the figure and the controls row, so their left edges line up):
+   title, link note, the figure, then the controls and the calculation. Below 700 px those two are stacked.
+   From 700 px up they sit side by side in a row that sticks to the bottom of the window, so the
+   controls stay in view while the figure scrolls. There is no wide-window column layout: the
+   figure stays 740 px wide wherever the window is at least 800 px wide (text >= 12 px). */
+.page { max-width: 740px; margin: 0 auto; }
+.fig-col { max-width: 740px; margin: 0 auto; }
+#fig { display: block; width: 100%; height: auto; }
+.side { max-width: 740px; margin: 6px auto 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
+.panel { border: 1px solid #d5dbe3; border-radius: 8px; padding: 6px 12px; background: #f9fafb; }
+@media (min-width: 700px) {
+  .side {
+    grid-template-columns: 1.1fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
+    position: sticky; bottom: 0; z-index: 2; background: #ffffff; border-top: 1px solid #d5dbe3; box-shadow: 0 -4px 6px -4px #0003;
+  }
+}
+
+/* ---- the "From the link" note: one small unboxed line under the title ---- */
+#from-link { margin: 0 0 2px; font-size: 13px; line-height: 1.3; color: #744210; }
+#from-link[hidden] { display: none; }
+
+/* ---- colours shared by labels and the calculation ------------------- */
+.c-rect { color: #2b6cb0; }
+.c-tri { color: #c05621; }
+.c-comb { color: #2f855a; }
+
+/* ---- sliders ----------------------------------------------------------- */
+.ctl { margin-bottom: 4px; }
+.ctl-head { font-size: 15px; line-height: 1.3; }
+.ctl-head label { cursor: pointer; }
+.readout { font-variant-numeric: tabular-nums; display: inline-block; min-width: 2.6em; text-align: right; }
+.zs { position: relative; padding-top: 2px; }
+.zt { position: absolute; left: 50%; top: 2px; width: 2px; height: 26px; margin-left: -1px; background: #2f855a; border-radius: 1px; pointer-events: none; }
+.zs input[type=range] {
+  position: relative; z-index: 1; display: block; width: 100%; height: 26px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+.zs input[type=range]:focus { outline: none; }
+.zs input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #a0aec0; }
+.zs input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: #a0aec0; }
+.zs input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; box-sizing: border-box; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: #ffffff; border: 3px solid #2d3748; box-shadow: 0 1px 3px #0004; transition: transform .08s, background .08s, border-color .08s;
+}
+.zs input[type=range]::-moz-range-thumb {
+  box-sizing: border-box; width: 22px; height: 22px; border-radius: 50%; background: #ffffff; border: 3px solid #2d3748; box-shadow: 0 1px 3px #0004;
+  transition: transform .08s, background .08s, border-color .08s;
+}
+.zs input[type=range]:hover::-webkit-slider-runnable-track { background: #718096; }
+.zs input[type=range]:hover::-moz-range-track { background: #718096; }
+.zs input[type=range]:hover::-webkit-slider-thumb { background: #ebf8ff; border-color: #2b6cb0; transform: scale(1.12); }
+.zs input[type=range]:hover::-moz-range-thumb { background: #ebf8ff; border-color: #2b6cb0; transform: scale(1.12); }
+.zs input[type=range]:active::-webkit-slider-thumb { background: #2b6cb0; border-color: #2c5282; transform: scale(1.2); }
+.zs input[type=range]:active::-moz-range-thumb { background: #2b6cb0; border-color: #2c5282; transform: scale(1.2); }
+.zs input[type=range]:focus-visible::-webkit-slider-thumb { border-color: #2b6cb0; box-shadow: 0 0 0 4px #2b6cb066; }
+.zs input[type=range]:focus-visible::-moz-range-thumb { border-color: #2b6cb0; box-shadow: 0 0 0 4px #2b6cb066; }
+.zl { position: relative; display: flex; justify-content: space-between; margin-top: 1px; font-size: 13px; line-height: 1.3; opacity: .9; }
+.zl .zero-label {
+  position: absolute; left: 50%; transform: translateX(-50%); padding: 0 8px; font-weight: 700; color: #2f855a;
+  border-radius: 10px; transition: background .1s, color .1s;
+}
+.zl .zero-label.on { background: #2f855a; color: #ffffff; }
+
+/* ---- the peak buttons ----------------------------------------------- */
+.peak-q { margin-top: 2px; font-size: 14px; line-height: 1.3; }
+.peak-row { display: flex; gap: 6px; margin-top: 3px; }
+.peak-btn {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; padding: 4px 6px; font: inherit; font-size: 13px; line-height: 1.3; color: #111827; text-align: left;
+  background: #edf2f7; border: 2px solid #a0aec0; border-radius: 6px; cursor: pointer;
+}
+.peak-btn svg { flex: none; }
+.peak-btn:hover { background: #e2e8f0; border-color: #4a5568; }
+.peak-btn:active { background: #cbd5e0; transform: translateY(1px); }
+.peak-btn:focus-visible { outline: 3px solid #2b6cb0; outline-offset: 2px; }
+.peak-btn.sel { background: #f0fff4; border-color: #2f855a; box-shadow: 0 0 0 2px #2f855a33; font-weight: 600; }
+.peak-btn.sel:hover { background: #e6fffa; }
+.peak-btn.sel:active { background: #c6f6d5; }
+
+/* ---- the calculation ------------------------------------------------ */
+/* Units make the lines longer; the tallest state (the cancelling one, with the couple note) must be no taller
+   than the controls panel, or the sticky row grows and covers the figure. So the calculation gets a little
+   more width (the 1.1fr 1fr row above; the controls column still offers >= 376 px, the 350 px of content two
+   peak buttons need), a tighter line height (1.25) and 2 px between lines, and tighter vertical padding. Text stays 13 px. */
+.calc-panel { padding-top: 4px; padding-bottom: 4px; }
+.calc-panel h2 { margin-bottom: 2px; }
+#calc { font-size: 13px; line-height: 1.25; }
+#calc .cl { margin-bottom: 2px; }
+#calc .cl:last-child { margin-bottom: 0; }
+#calc .note { font-style: italic; color: #4a5568; }
+#calc .rnd { color: #4a5568; }
+
+/* The link to the detailed page: one 13 px line under the calculation, outside #calc (which is rewritten).
+   It adds 2 px of margin plus one line of 13 px x 1.3 = 16.9 px (.more has its own line height, 1.3, not the
+   calculation's 1.25), and no padding, to the calculation panel. The calculation's line height (1.25) and
+   the 2 px between lines were tightened to make room for it: the tallest (couple)
+   state plus the link must still be no taller than the 720 px window at 1280 px wide. */
+.more { display: block; width: fit-content; margin: 2px 0 0; padding: 0 2px; font-size: 13px; line-height: 1.3; color: #2b6cb0; text-decoration: underline; border-radius: 3px; }
+.more:hover { color: #1a365d; background: #ebf8ff; }
+.more:active { color: #1a365d; background: #bee3f8; }
+.more:focus-visible { outline: 3px solid #2b6cb0; outline-offset: 1px; }
+
+/* The detailed-calculation page. Built after styles.css, so it only adds to it: the page column, the
+   figure column, .panel, the sliders and #from-link (the link note, under the back link) come from there unchanged. */
+
+/* ---- the back link: one line under the title, with visible hover, active and keyboard-focus states ---- */
+#back-link {
+  display: inline-block; margin: 2px 0 4px; padding: 2px 4px; font-size: 15px; line-height: 1.3;
+  color: #2b6cb0; text-decoration: underline; border-radius: 4px;
+}
+#back-link:hover { color: #1a365d; background: #ebf8ff; }
+#back-link:active { color: #1a365d; background: #bee3f8; transform: translateY(1px); }
+#back-link:focus-visible { outline: 3px solid #2b6cb0; outline-offset: 2px; }
+
+/* ---- the sliders sit directly under the figure, in the same column ---- */
+#controls { margin: 6px auto 0; max-width: 740px; }
+
+/* ---- one calculation block per heading; the page scrolls through them ---- */
+.dblock { margin: 20px 0 0; padding-top: 10px; border-top: 1px solid #d5dbe3; }
+.dblock h2 { margin: 0 0 8px; font-size: 18px; line-height: 1.3; font-weight: 600; }
+.dbody { font-size: 16px; line-height: 1.5; }
+
+/* ---- the top item stays compact so heading, figure and sliders fit a 700 px window ---- */
+#actual h2 { margin: 4px 0 2px; font-size: 18px; line-height: 1.3; }
+
+/* ---- the calculation lines. Set-up lines are plain (no rule of their own: they take the page's ink colour);
+   the plug-in lines (the only ones with numbers) carry a green left border and a faint tint; notes are
+   italic. A line wraps at its spaces only:
+   every number and its unit are joined by a no-break space, so a number never splits from its unit. ---- */
+.dbody .step { margin: 0 0 8px; }
+.dbody .plug { margin: 4px 0; padding: 3px 10px; background: #f0fff4; border-left: 3px solid #2f855a; border-radius: 0 4px 4px 0; overflow-wrap: break-word; }
+.dbody .note { margin: 6px 0 0; font-style: italic; color: #4a5568; }
+.dbody .rnd { font-size: 13px; font-style: normal; color: #4a5568; }
+
+/* a variable: serif italic; its subscript is at least 12 px but sits on a relative offset with no
+   line-height of its own, so a subscript never makes its line taller */
+i.v { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+.dbody sub { font-size: 12px; line-height: 0; vertical-align: baseline; position: relative; top: .3em; }
+
+</style>
+</head>
+<body>
+<main class="page">
+<h1>Distributed load on a beam: detailed calculation</h1>
+<a id="back-link" href="distributed_load_beam.html">Back to the simulation</a>
+<p id="from-link" hidden></p>
+<section id="actual" aria-labelledby="h-actual"><h2 id="h-actual">Actual load on AB</h2>
+<div class="fig-col">
+<svg id="detail-fig" viewBox="0 0 960 356" role="img" aria-label="A 4&nbsp;m beam fixed to a wall at A with the load on the half AB, labelled by its heights w_A and w_B"></svg>
+</div>
+<section id="controls" class="panel" aria-label="Load controls">
+  <div class="ctl">
+    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b>&nbsp;N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200&nbsp;N/m (up)</span><span id="r-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (down)</span></div>
+    </div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b>&nbsp;N/m</div>
+    <div class="zs">
+      <i class="zt"></i>
+      <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
+      <div class="zl"><span>−200&nbsp;N/m (up)</span><span id="t-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (down)</span></div>
+    </div>
+  </div>
+  <div class="peak">
+    <div id="peak-label" class="peak-q">Which end comes to a point (w = 0&nbsp;N/m)?</div>
+    <div class="peak-row" role="group" aria-labelledby="peak-label">
+      <button type="button" id="peak-b" class="peak-btn sel" aria-pressed="true"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L32 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at A, peak at B</span></button>
+      <button type="button" id="peak-a" class="peak-btn" aria-pressed="false"><svg width="24" height="13" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 16 L32 16 L2 2 Z" fill="currentColor" opacity=".55"/></svg><span>zero at B, peak at A</span></button>
+    </div>
+  </div>
+</section>
+</section>
+<section class="dblock" id="blk-rect" aria-labelledby="h-rect">
+<h2 id="h-rect">Calculating the rectangular loading</h2>
+<div class="dbody" id="body-rect"></div>
+</section>
+<section class="dblock" id="blk-tri" aria-labelledby="h-tri">
+<h2 id="h-tri">Calculating the triangular loading</h2>
+<div class="dbody" id="body-tri"></div>
+</section>
+<section class="dblock" id="blk-comb" aria-labelledby="h-comb">
+<h2 id="h-comb">Calculating the combined loading</h2>
+<div class="dbody" id="body-comb"></div>
+</section>
+</main>
+<script>
+(function () {
+"use strict";
+// ===== physics.js =====
+const BEAM_L = 4;            // m, the whole beam (A at the wall, B at the middle, C at the tip)
+const LOADED_L = 2;          // m, the loaded half AB
+const W_MAX = 200;           // N/m, slider range is -W_MAX..+W_MAX
+const W_STEP = 5;            // N/m
+const W_SNAP = 10;           // N/m, |w| <= W_SNAP snaps to 0
+
+// Slider value -> allowed value: clamp, round to W_STEP, snap the zero zone to 0.
+// Non-finite input becomes 0, and the result is never -0.
+function snapW(v) {
+  if (!Number.isFinite(v)) return 0;
+  const clamped = Math.max(-W_MAX, Math.min(W_MAX, v));
+  const stepped = Math.round(clamped / W_STEP) * W_STEP;
+  return Math.abs(stepped) <= W_SNAP ? 0 : stepped + 0;
+}
+
+// Slider input handler. A pointer drag just snaps. A keyboard nudge that would
+// land back in the zero zone while the slider already sits at 0 would never be
+// able to leave 0 (one step is smaller than the zone), so it jumps straight
+// past the zone to +-(W_SNAP + W_STEP) in the direction of the nudge.
+function nextW(prev, raw, viaKeyboard) {
+  const snapped = snapW(raw);
+  if (viaKeyboard && prev === 0 && snapped === 0 && raw !== 0 && Number.isFinite(raw)) {
+    return raw > 0 ? W_SNAP + W_STEP : -(W_SNAP + W_STEP);
+  }
+  return snapped;
+}
+
+// Load intensity w(x) in N/m at x metres from A, 0 <= x <= LOADED_L.
+// s = { r, t, peak }; the triangle is t at its peak end and 0 at the other.
+function loadAt(s, x) {
+  const frac = s.peak === 'B' ? x / LOADED_L : 1 - x / LOADED_L;
+  return s.r + s.t * frac;
+}
+
+// Equivalent forces: signed F (+ down) and x in m from A (null when F is 0).
+// The combined location comes from summing moments about A. The triangle's
+// moment is written as t*L*L/3 (peak B) or t*L*L/6 (peak A), which equals
+// F_tri * x_tri but keeps round numbers exact (e.g. -12 rather than -11.999...).
+function equivalents(s) {
+  const L = LOADED_L;
+  const rectF = s.r * L + 0;
+  const triF = 0.5 * s.t * L + 0;
+  const triX = s.peak === 'B' ? 2 * L / 3 : L / 3;
+  const rectM = rectF * (L / 2);
+  const triM = s.peak === 'B' ? s.t * L * L / 3 : s.t * L * L / 6;
+  const combF = rectF + triF + 0;
+  const rect = { F: rectF, x: rectF === 0 ? null : L / 2 };
+  const tri = { F: triF, x: triF === 0 ? null : triX };
+  const comb = { F: combF, x: combF === 0 ? null : (rectM + triM) / combF };
+  const couple = combF === 0 && (rectF !== 0 || triF !== 0);
+  return { rect, tri, comb, couple };
+}
+
+// ===== format.js =====
+
+
+const MINUS = '−';
+
+// A number and its unit are never separated by a line break: the space between them is a no-break space.
+const NBSP = '\u00a0';
+
+// The only way a number reaches the screen. Rounds here and nowhere else; a
+// null or non-finite value prints as a dash; and negative zero can never
+// appear, because String(-0) is "0" and Number("-0.00") is -0.
+function fmt(n, dp = 2) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const s = String(Number(n.toFixed(dp)));
+  return s.startsWith('-') ? MINUS + s.slice(1) : s;
+}
+
+// Always exactly dp decimals ("1.00", "4.00"): used for locations along the beam, where the
+// trailing zeros are part of the reading. A tiny negative that rounds to zero prints "0.00"
+// (toFixed keeps the sign: (-0.001).toFixed(2) is "-0.00"). Non-finite or missing prints a dash.
+function fmtFixed(n, dp = 2) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  let s = n.toFixed(dp);
+  if (/^-0(\.0*)?$/.test(s)) s = s.slice(1);
+  return s.startsWith('-') ? MINUS + s.slice(1) : s;
+}
+
+// Signed force (+ down) in words: "200 N down", "10 N up", "0 N".
+// Whole numbers print with no decimals, anything else with two.
+function forceWords(F) {
+  const mag = Math.abs(F);
+  const dp = Number.isInteger(mag) ? 0 : 2;
+  const text = fmt(mag, dp);
+  if (text === '0' || text === '—') return `${text}${NBSP}N`;
+  return `${text}${NBSP}N ${F > 0 ? 'down' : 'up'}`;
+}
+
+// Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
+function locWords(x) {
+  if (x === null || x === undefined) return '';
+  // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
+  return `at x = ${fmtFixed(x)}${NBSP}m from A${word ? ` (${word})` : ''}`;
+}
+
+// ===== svg.js =====
+const NS = 'http://www.w3.org/2000/svg';
+
+// One palette for the whole app. It lives here rather than in each renderer
+// because build.js concatenates every module into a single scope, so a
+// top-level `const C1` in three files would collide and fail the build.
+const COLORS = {
+  rect:    '#2b6cb0',   // the rectangular load and its equivalent force
+  tri:     '#c05621',   // the triangular load and its equivalent force
+  comb:    '#2f855a',   // the combined equivalent force
+  ink:     '#111827',   // text and outlines
+  beam:    '#8a94a6',   // the beam
+  wall:    '#cbd5e0',   // the wall and its hatching
+  outline: '#4a5568'    // beam outline
+};
+
+function el(name, attrs = {}, parent = null) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) {
+    const v = attrs[k];
+    if (v !== null && v !== undefined) node.setAttribute(k, String(v));
+  }
+  if (parent) parent.appendChild(node);
+  return node;
+}
+
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+// Text with a background-coloured halo so labels stay readable where they cross lines.
+function text(parent, x, y, str, opts = {}) {
+  const node = el('text', {
+    x, y,
+    'font-size': opts.size || 16,
+    'font-family': 'system-ui, -apple-system, sans-serif',
+    'font-style': opts.italic ? 'italic' : null,
+    fill: opts.fill || COLORS.ink,
+    'text-anchor': opts.anchor || 'start',
+    'font-weight': opts.weight || 400,
+    'paint-order': 'stroke',
+    stroke: '#ffffff',
+    'stroke-width': opts.halo === false ? 0 : 3.5,
+    'stroke-linejoin': 'round'
+  }, parent);
+  node.textContent = str;
+  return node;
+}
+
+// ===== state.js =====
+
+
+const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+
+// Everything is derived from {r, t, peak}; nothing else is stored.
+function derive(s) {
+  return equivalents(s);
+}
+
+// Pure store: no DOM. Subscribers are called with a copy of the new state, and
+// only when a stored value actually changed.
+function createState() {
+  let cur = { ...DEFAULTS };
+  const subs = new Set();
+
+  function commit(next) {
+    if (next.r === cur.r && next.t === cur.t && next.peak === cur.peak) return;
+    cur = next;
+    const snapshot = { ...cur };
+    for (const fn of [...subs]) fn(snapshot);
+  }
+
+  const isPeak = (p) => p === 'A' || p === 'B';
+
+  return {
+    getState: () => ({ ...cur }),
+    setR: (raw, viaKeyboard) => commit({ ...cur, r: nextW(cur.r, raw, viaKeyboard) }),
+    setT: (raw, viaKeyboard) => commit({ ...cur, t: nextW(cur.t, raw, viaKeyboard) }),
+    setPeak: (p) => { if (isPeak(p)) commit({ ...cur, peak: p }); },
+    // A batch (presets): each field is snapped, missing/invalid fields are kept, one notification.
+    set: (p = {}) => commit({
+      r: p.r === undefined ? cur.r : nextW(cur.r, p.r, false),
+      t: p.t === undefined ? cur.t : nextW(cur.t, p.t, false),
+      peak: isPeak(p.peak) ? p.peak : cur.peak
+    }),
+    subscribe: (fn) => { subs.add(fn); return () => { subs.delete(fn); }; },
+    reset: () => commit({ ...DEFAULTS })
+  };
+}
+
+// ===== presets.js =====
+
+
+
+// Optional URL parameters that preset a problem:
+//   r=N/m  rectangular load    t=N/m  triangular peak load    peak=A|B  where the triangle peaks
+// Presets are configuration read once at load, held OUTSIDE the state. Every number goes through
+// snapW (the same snapping as the sliders) and a change you could see is reported.
+
+// No exponent, no hex, no empty. Written unambiguously (\d+(\.\d*)?, not \d+\.?\d*): the looser
+// form backtracks quadratically on a long digit string with a bad last character.
+const PRESET_NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+const PRESET_SHOWN_MAX = 40;                      // characters of a rejected value echoed back
+const PRESET_NUMBER_HINT = 'use a number of N/m';
+const PRESET_PEAK_HINT = 'use A or B';
+
+function presetNumber(text) {
+  // The page prints a real minus sign (U+2212), so a number pasted from the screen starts with one.
+  const s = text.trim().replace(/^−/, '-');
+  if (!PRESET_NUMBER.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;           // 400 digits overflow to Infinity
+}
+
+// A rejected value is echoed back, but a 2,000-character one would overflow the page.
+function presetShown(raw) {
+  const chars = Array.from(raw);
+  return chars.length > PRESET_SHOWN_MAX ? chars.slice(0, PRESET_SHOWN_MAX).join('') + '…' : raw;
+}
+
+// Reads a load. Returns the snapped value, or undefined (and an ignored note) when it is not a number.
+function presetLoad(name, raw, out) {
+  const n = presetNumber(raw);
+  if (n === null) {
+    out.ignored.push(`${name}=${presetShown(raw)} (${PRESET_NUMBER_HINT})`);
+    return undefined;
+  }
+  const s = snapW(n);                              // never -0
+  // Compare what would be PRINTED: a snap too small to show (100.0001 to 100) is no news.
+  if (fmt(n) !== fmt(s)) out.adjusted.push(`${name} ${fmt(n)}${NBSP}N/m → ${fmt(s)}${NBSP}N/m`);
+  return s;
+}
+
+function presetPeak(raw, out) {
+  const v = raw.trim().toUpperCase();
+  if (v === 'A' || v === 'B') return v;
+  out.ignored.push(`peak=${presetShown(raw)} (${PRESET_PEAK_HINT})`);
+  return undefined;
+}
+
+function parsePresets(search) {
+  const q = new URLSearchParams(search || '');
+  const out = { r: undefined, t: undefined, peak: undefined, adjusted: [], ignored: [] };
+  // The first duplicate wins (get); a missing key is null. Notes follow the order r, t, peak.
+  const r = q.get('r');
+  if (r !== null) out.r = presetLoad('r', r, out);
+  const t = q.get('t');
+  if (t !== null) out.t = presetLoad('t', t, out);
+  const peak = q.get('peak');
+  if (peak !== null) out.peak = presetPeak(peak, out);
+  return out;
+}
+
+function describePresets(p) {
+  const set = [];
+  if (p.r !== undefined) set.push(`r = ${fmt(p.r)}${NBSP}N/m`);
+  if (p.t !== undefined) set.push(`t = ${fmt(p.t)}${NBSP}N/m`);
+  if (p.peak !== undefined) set.push(`peak at ${p.peak}`);
+  const parts = [];
+  if (set.length) parts.push(`From the link: ${set.join(', ')}.`);
+  else if (p.adjusted.length || p.ignored.length) parts.push('From the link: nothing set.');
+  if (p.adjusted.length) parts.push(`Adjusted: ${p.adjusted.join('; ')}.`);
+  if (p.ignored.length) parts.push(`Ignored: ${p.ignored.join('; ')}.`);
+  return parts.join(' ');
+}
+
+// ===== link.js =====
+
+
+// The two pages sit side by side; each links to the other by file name, carrying the slider state.
+const MAIN_PAGE = 'distributed_load_beam.html';
+const DETAIL_PAGE = 'distributed_load_beam_detail.html';
+
+// A slider value as it travels in a link: printed exactly as the page prints it (fmt), but with an
+// ASCII hyphen-minus, which URLs and parsePresets read without help. fmt never prints -0.
+function linkNumber(n) {
+  return fmt(n).replace(MINUS, '-');
+}
+
+// State {r, t, peak} -> the query string parsePresets reads back: '?r=100&t=-100&peak=B'.
+function presetQuery(s) {
+  return `?r=${linkNumber(s.r)}&t=${linkNumber(s.t)}&peak=${s.peak}`;
+}
+
+// ===== layout.js =====
+
+
+// Figure geometry, all in viewBox units with y growing downward. Pure: no DOM.
+// Sign convention: a positive (down) load or force sits ABOVE the beam and its
+// arrow head touches the beam's top face; a negative one sits BELOW and the head
+// touches the beam's bottom face.
+const VB = { w: 960, h: 560 };
+const BEAM_H = 24;
+// top figure (the actual load); `band` is the room above and below the beam
+const TOP = { x0: 90, px: 150, beamY: 90, unit: 0.2, band: 80, dimY: 206, dimTextY: 228, textX: 730 };
+// three columns (the equivalent forces); fs is the FIXED force scale, units per newton
+// `card` is the framed, tinted card around each column: dx from COLS.x[k] to its left edge, w its width, y its top, bottom its
+// lower edge (its stroke must stay inside VB.h), rx the corner radius, headH the height of the heading band that holds the three
+// text lines (it must end above COLS.beamY - COLS.band), stroke the frame width. textPad is the left padding of those lines.
+const COLS = {
+  x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306], textPad: 8,
+  card: { dx: -4, w: 300, y: 240, bottom: 558, rx: 8, headH: 74, stroke: 1.5 }
+};
+
+const LAYOUT_MIN_ARROW = 8;   // net-load arrows shorter than this are not drawn
+const LAYOUT_ARROWS = 8;
+
+// metres from A -> viewBox x in the top figure
+function topX(x) {
+  return TOP.x0 + x * TOP.px;
+}
+
+// column k (0 rect, 1 tri, 2 comb), metres from A -> viewBox x
+function colX(k, x) {
+  return COLS.x[k] + COLS.offset + x * COLS.px;
+}
+
+// The card of column k (0 rect, 1 tri, 2 comb): { x, y, w, h, rx, headH } in viewBox units.
+function columnCard(k) {
+  const c = COLS.card;
+  return { x: COLS.x[k] + c.dx, y: c.y, w: c.w, h: c.bottom - c.y, rx: c.rx, headH: c.headH };
+}
+
+// One arrow of length len pointing at the beam from the side the sign says.
+function layoutArrow(x, signed, len, beamY) {
+  const yHead = signed > 0 ? beamY : beamY + BEAM_H;
+  const yTail = signed > 0 ? yHead - len : yHead + len;
+  return { x, yTail, yHead };
+}
+
+// s = { r, t, peak } -> { rect, tri, arrows }
+function loadShapes(s) {
+  const x0 = topX(0);
+  const x2 = topX(LOADED_L);
+  const beamTop = TOP.beamY;
+  const beamBot = TOP.beamY + BEAM_H;
+  const rh = Math.abs(s.r) * TOP.unit;
+  const th = Math.abs(s.t) * TOP.unit;
+
+  let rect = null;
+  if (s.r !== 0) {
+    rect = { x: x0, y: s.r > 0 ? beamTop - rh : beamBot, w: x2 - x0, h: rh };
+  }
+
+  let tri = null;
+  if (s.t !== 0) {
+    const up = s.t > 0;                                  // triangle above the beam
+    const stacked = s.r !== 0 && (s.r > 0) === up;       // same side as the rectangle
+    const face = up ? beamTop : beamBot;
+    const base = stacked ? (up ? beamTop - rh : beamBot + rh) : face;
+    const apexY = up ? base - th : base + th;
+    const apexX = s.peak === 'A' ? x0 : x2;
+    tri = { pts: [[x0, base], [x2, base], [apexX, apexY]] };
+  }
+
+  const arrows = [];
+  for (let i = 0; i < LAYOUT_ARROWS; i++) {
+    const m = (i + 0.5) * LOADED_L / LAYOUT_ARROWS;
+    const w = loadAt(s, m);
+    const len = Math.abs(w) * TOP.unit;
+    if (len < LAYOUT_MIN_ARROW) continue;
+    arrows.push(layoutArrow(topX(m), w, len, beamTop));
+  }
+  return { rect, tri, arrows };
+}
+
+// Equivalent force F (signed, + down) at x metres from A in column k, or null
+// when there is nothing to draw (no force, no location, or a location off the beam). At x = 0
+// the head partly overlaps the wall rectangle: accepted, not a defect.
+function forceArrow(k, F, x) {
+  if (F === 0 || x === null || x === undefined || x < 0 || x > BEAM_L) return null;
+  return layoutArrow(colX(k, x), F, COLS.fs * Math.abs(F), COLS.beamY);
+}
+
+// One piece of a load outline in column k: the load runs from xa to xb metres with signed
+// intensity wa at xa and wb at xb (same sign, either may be 0). The base lies on the beam face the
+// load pushes from (top for +, bottom for -); the height is the intensity at the top figure's scale.
+// A zero end contributes no point, so a piece with one zero end is a triangle, never a degenerate shape.
+function layoutPiece(k, xa, xb, wa, wb) {
+  const base = wa + wb > 0 ? COLS.beamY : COLS.beamY + BEAM_H;
+  const poly = [[colX(k, xa), base]];
+  if (wa !== 0) poly.push([colX(k, xa), base - wa * TOP.unit]);
+  if (wb !== 0) poly.push([colX(k, xb), base - wb * TOP.unit]);
+  poly.push([colX(k, xb), base]);
+  return poly;
+}
+
+// The net load w(x) = r + t f(x) on AB: its two end values, split at the zero crossing if the sign changes.
+function layoutNet(s) {
+  const w0 = loadAt(s, 0);
+  const wL = loadAt(s, LOADED_L);
+  if (w0 === 0 && wL === 0) return [];
+  if (w0 * wL < 0) {
+    const xc = LOADED_L * w0 / (w0 - wL);
+    return [layoutPiece(2, 0, xc, w0, 0), layoutPiece(2, xc, LOADED_L, 0, wL)];
+  }
+  return [layoutPiece(2, 0, LOADED_L, w0, wL)];
+}
+
+// Dotted outline of the load that column k's force replaces: 0 the rectangle, 1 the triangle,
+// 2 the net (combined) load. s = { r, t, peak } -> array of polygons (arrays of [x, y], closed
+// implicitly), empty when that load is zero.
+function columnOutline(k, s) {
+  if (k === 0) return s.r === 0 ? [] : [layoutPiece(0, 0, LOADED_L, s.r, s.r)];
+  if (k === 1) {
+    if (s.t === 0) return [];
+    return [s.peak === 'B' ? layoutPiece(1, 0, LOADED_L, 0, s.t) : layoutPiece(1, 0, LOADED_L, s.t, 0)];
+  }
+  return layoutNet(s);
+}
+
+// ===== scene.js =====
+
+
+
+
+
+
+// Drawing style only: every position and length comes from layout.js.
+const SCENE_TEXT = 16;            // every text is at least this many units (12 px at 800 px wide)
+const SCENE_LINE_MAX = 24;        // characters per line in the top-right text block
+const SCENE_FILL = 0.2;           // fill opacity of the load shapes
+const SCENE_DASH = '5 3';
+const SCENE_OUTLINE_DASH = '2 4';  // the dotted outline of the load in each column
+const SCENE_OUTLINE_W = 1.8;
+const SCENE_WALL_W = 14;
+const SCENE_WALL_OVER = 18;       // the wall rises this far above and below the beam
+const SCENE_HATCHES = 4;
+const SCENE_PIN_R = BEAM_H / 2;   // the A, B, C circles exactly fill the beam's height
+const SCENE_HEAD_MAX = 9;         // arrow head length cap
+const SCENE_CARD_FILL = 0.05;     // the column card's tint
+const SCENE_CARD_STROKE = 0.45;   // the column card's frame opacity
+const SCENE_CARD_HEAD = 0.12;     // the heading band's tint
+
+// A text node with its class set (svg.js's text() takes no class option).
+function sceneText(parent, x, y, str, opts, cls = 't') {
+  const node = text(parent, x, y, str, { size: SCENE_TEXT, ...opts });
+  node.setAttribute('class', cls);
+  return node;
+}
+
+// One arrow group: shaft line plus head path, the head's tip at (a.x, a.yHead).
+function sceneArrow(parent, a, color, width) {
+  const dir = a.yHead > a.yTail ? 1 : -1;
+  const headLen = Math.min(SCENE_HEAD_MAX, Math.abs(a.yHead - a.yTail) * 0.6);
+  const half = width * 1.6 + 1;
+  const yBase = a.yHead - dir * headLen;
+  const g = el('g', { class: 'g' }, parent);
+  el('line', { x1: a.x, y1: a.yTail, x2: a.x, y2: yBase, stroke: color, 'stroke-width': width }, g);
+  el('path', { d: `M${a.x - half} ${yBase} L${a.x} ${a.yHead} L${a.x + half} ${yBase} Z`, fill: color }, g);
+  return g;
+}
+
+// A beam copy starting at x0 with its top face at y, `px` units per metre,
+// a hatched wall at A and A, B, C circles centred on the beam's mid-line.
+function sceneBeam(parent, x0, y, px) {
+  el('rect', { class: 'g', x: x0, y, width: BEAM_L * px, height: BEAM_H, fill: COLORS.beam, stroke: COLORS.outline }, parent);
+  const wallTop = y - SCENE_WALL_OVER;
+  const wallH = BEAM_H + 2 * SCENE_WALL_OVER;
+  const wallX = x0 - SCENE_WALL_W;
+  el('rect', { class: 'g wall', x: wallX, y: wallTop, width: SCENE_WALL_W, height: wallH, fill: COLORS.wall, stroke: COLORS.outline }, parent);
+  const step = wallH / SCENE_HATCHES;
+  for (let i = 0; i < SCENE_HATCHES; i++) {
+    el('line', {
+      class: 'g wall', x1: wallX, y1: wallTop + (i + 1) * step, x2: wallX - SCENE_WALL_W, y2: wallTop + i * step,
+      stroke: COLORS.outline
+    }, parent);
+  }
+  const cy = y + BEAM_H / 2;
+  const pins = [['A', 0], ['B', LOADED_L], ['C', BEAM_L]];
+  for (const [name, m] of pins) {
+    const cx = x0 + m * px;
+    el('circle', { class: 'g pc', cx, cy, r: SCENE_PIN_R, fill: '#ffffff', stroke: COLORS.ink, 'stroke-width': 1.6 }, parent);
+    sceneText(parent, cx, cy + 6, name, { anchor: 'middle', weight: 700, halo: false }, 'tin');
+  }
+}
+
+// The top-right text block as [string, colour, bold] lines. A line longer than
+// SCENE_LINE_MAX characters is split after its colon, so nothing runs off the page.
+function sceneTopLines(s) {
+  const lines = [['Actual load on AB', COLORS.ink, true]];
+  const entries = [
+    [`Rectangular: ${fmt(s.r, 0)}${NBSP}N/m`, COLORS.rect],
+    [`Triangular: peak ${fmt(s.t, 0)}${NBSP}N/m at ${s.peak}`, COLORS.tri]
+  ];
+  for (const [str, color] of entries) {
+    if (str.length <= SCENE_LINE_MAX) { lines.push([str, color, false]); continue; }
+    const cut = str.indexOf(': ') + 1;
+    lines.push([str.slice(0, cut), color, false], [str.slice(cut + 1), color, false]);
+  }
+  return lines;
+}
+
+// The three text lines of equivalent-force column k: name, force, location.
+function sceneColumnLines(name, part, d) {
+  const F = part.F;
+  let third;
+  if (F === 0) {
+    if (name !== 'Combined') third = 'no load of this kind';
+    else third = d.couple ? 'the parts cancel: no single force' : 'no load';
+  } else {
+    third = locWords(part.x);
+  }
+  return [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
+}
+
+function sceneTop(svg, s) {
+  const shapes = loadShapes(s);
+  if (shapes.rect) {
+    const r = shapes.rect;
+    el('rect', {
+      class: 'g', x: r.x, y: r.y, width: r.w, height: r.h, fill: COLORS.rect, 'fill-opacity': SCENE_FILL,
+      stroke: COLORS.rect, 'stroke-dasharray': SCENE_DASH
+    }, svg);
+  }
+  if (shapes.tri) {
+    const pts = shapes.tri.pts.map(p => p.join(' ')).join(' L');
+    el('path', {
+      class: 'g', d: `M${pts} Z`, fill: COLORS.tri, 'fill-opacity': SCENE_FILL,
+      stroke: COLORS.tri, 'stroke-dasharray': SCENE_DASH
+    }, svg);
+  }
+  for (const a of shapes.arrows) sceneArrow(svg, a, COLORS.ink, 1.4);
+  sceneBeam(svg, topX(0), TOP.beamY, TOP.px);
+
+  const g = el('g', { class: 'g' }, svg);
+  const tick = 5;
+  const xA = topX(0), xB = topX(LOADED_L), xC = topX(BEAM_L);
+  const y = TOP.dimY;
+  el('line', { x1: xA, y1: y, x2: xB, y2: y, stroke: COLORS.outline }, g);
+  el('line', { x1: xA, y1: y - tick, x2: xA, y2: y + tick, stroke: COLORS.outline }, g);
+  el('line', { x1: xB, y1: y - tick, x2: xB, y2: y + tick, stroke: COLORS.outline }, g);
+  el('line', { x1: xB, y1: y, x2: xC, y2: y, stroke: COLORS.beam, 'stroke-dasharray': '4 3' }, g);
+  el('line', { x1: xC, y1: y - tick, x2: xC, y2: y + tick, stroke: COLORS.beam }, g);
+  sceneText(svg, (xA + xB) / 2, TOP.dimTextY, `AB = 2${NBSP}m (loaded)`, { anchor: 'middle' });
+  sceneText(svg, (xB + xC) / 2, TOP.dimTextY, `BC = 2${NBSP}m (no load)`, { anchor: 'middle' }).setAttribute('opacity', 0.6);
+
+  // heading, rectangular, triangular (one or two lines), then the sign note
+  const dy = [-28, -6, 16, 38, 60];
+  const lines = sceneTopLines(s);
+  lines.forEach(([str, color, bold], i) => {
+    sceneText(svg, TOP.textX, TOP.beamY + dy[i], str, { fill: color, weight: bold ? 700 : 400 });
+  });
+  sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ down, − up)', {}).setAttribute('opacity', 0.7);
+}
+
+// A dotted, unfilled outline of one layout polygon (its points as given, closed with Z).
+function sceneOutline(parent, poly, color) {
+  const d = `M${poly.map(p => p.join(' ')).join(' L')} Z`;
+  return el('path', {
+    class: 'g outline', d, fill: 'none', stroke: color, 'stroke-width': SCENE_OUTLINE_W,
+    'stroke-dasharray': SCENE_OUTLINE_DASH, 'stroke-linecap': 'round'
+  }, parent);
+}
+
+// The card of column k: a tinted, framed rounded rectangle, then its heading band (the same tint, darker,
+// square at the bottom and rounded like the card at the top). Class `card`, not `g`: the harness's
+// text-versus-graphic checks must ignore them.
+function sceneCard(parent, k, color) {
+  const c = columnCard(k);
+  el('rect', {
+    class: 'card', x: c.x, y: c.y, width: c.w, height: c.h, rx: c.rx, fill: color, 'fill-opacity': SCENE_CARD_FILL,
+    stroke: color, 'stroke-opacity': SCENE_CARD_STROKE, 'stroke-width': COLS.card.stroke
+  }, parent);
+  const r = c.rx, right = c.x + c.w, bottom = c.y + c.headH;
+  el('path', {
+    class: 'card', fill: color, 'fill-opacity': SCENE_CARD_HEAD,
+    d: `M${c.x} ${c.y + r} A${r} ${r} 0 0 1 ${c.x + r} ${c.y} H${right - r} A${r} ${r} 0 0 1 ${right} ${c.y + r} V${bottom} H${c.x} Z`
+  }, parent);
+}
+
+function sceneColumns(svg, d, s) {
+  const parts = [
+    ['Rectangular', d.rect, COLORS.rect],
+    ['Triangular', d.tri, COLORS.tri],
+    ['Combined', d.comb, COLORS.comb]
+  ];
+  parts.forEach(([name, part, color], k) => {
+    sceneCard(svg, k, color);
+    sceneBeam(svg, colX(k, 0), COLS.beamY, COLS.px);
+    for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
+    const a = forceArrow(k, part.F, part.x);
+    if (a) sceneArrow(svg, a, color, 3.4);
+    const lines = sceneColumnLines(name, part, d);
+    lines.forEach((str, i) => {
+      if (str === '') return;
+      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
+    });
+  });
+}
+
+// render(s) clears the figure and redraws it from s = { r, t, peak } alone.
+function createScene(svg) {
+  return {
+    render(s) {
+      clear(svg);
+      sceneTop(svg, s);
+      sceneColumns(svg, derive(s), s);
+    }
+  };
+}
+
+// ===== panel.js =====
+
+
+
+
+// The calculation, written out with the numbers substituted. Every number comes from
+// fmt (forces, whole) or fmtFixed (locations, two decimals); everything else is a fixed
+// string, so no URL text can reach this HTML.
+const PANEL_XBAR = 'x̄';
+
+// Every number is followed by its unit (N, N/m or m), also inside a formula. A negative number
+// inside a sum or product is written in parentheses, unit inside: (−190 N/m).
+const PANEL_N = 'N';
+const PANEL_NPM = 'N/m';
+const PANEL_M = 'm';
+function panelPar(n, unit) {
+  const text = fmt(n);
+  return text.startsWith(MINUS) ? `(${text}${NBSP}${unit})` : `${text}${NBSP}${unit}`;
+}
+
+function panelRect(d, s) {
+  const name = '<span class="c-rect"><b>Rectangle</b></span>';
+  if (d.rect.F === 0) return `${name}: w = 0${NBSP}${PANEL_NPM}, so there is no rectangular load and no force from it.`;
+  return `${name} (constant w): F = w × L = ${panelPar(s.r, PANEL_NPM)} × ${fmt(LOADED_L)}${NBSP}${PANEL_M} = <b>${fmt(d.rect.F)}${NBSP}${PANEL_N}</b>, ` +
+    `acting at the middle of AB: x = ${fmtFixed(d.rect.x)}${NBSP}${PANEL_M}`;
+}
+
+function panelTri(d, s) {
+  const peak = s.peak === 'A' ? 'A' : 'B';          // never raw text into innerHTML
+  const name = '<span class="c-tri"><b>Triangle</b></span>';
+  if (d.tri.F === 0) return `${name}: peak = 0${NBSP}${PANEL_NPM}, so there is no triangular load and no force from it.`;
+  return `${name}: F = ½ × peak × L = ½ × ${panelPar(s.t, PANEL_NPM)} × ${fmt(LOADED_L)}${NBSP}${PANEL_M} = <b>${fmt(d.tri.F)}${NBSP}${PANEL_N}</b>, ` +
+    `acting one third of the way in from the larger end (the peak is at ${peak}): x = ${fmtFixed(d.tri.x)}${NBSP}${PANEL_M}`;
+}
+
+// A word when the combined force acts off the beam (judged on the printed value).
+function panelWhere(x) {
+  const shown = Number(fmtFixed(x).replace(MINUS, '-'));
+  if (shown < 0) return ' (off the beam, left of the wall)';
+  return shown > BEAM_L ? ' (off the beam, beyond C)' : '';
+}
+
+// True when working the sum from the PRINTED (rounded) locations would not print the printed answer.
+function panelNeedsExact(d) {
+  const shown = (v) => Number(fmtFixed(v));
+  const again = (d.rect.F * shown(d.rect.x) + d.tri.F * shown(d.tri.x)) / d.comb.F;
+  return fmtFixed(again) !== fmtFixed(d.comb.x);
+}
+
+function panelComb(d) {
+  const name = '<span class="c-comb"><b>Combined</b></span>';
+  const sum = `F = ${panelPar(d.rect.F, PANEL_N)} + (${fmt(d.tri.F)}${NBSP}${PANEL_N}) = <b>${fmt(d.comb.F)}${NBSP}${PANEL_N}</b>`;
+  if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so there is no combined force.`;
+  if (d.comb.F === 0) return `${name}: ${sum}: the two parts cancel, so no single force replaces them.`;
+  if (d.rect.F === 0 || d.tri.F === 0) {
+    const only = d.rect.F === 0 ? 'triangle' : 'rectangle';
+    return `${name}: ${sum}, at ${PANEL_XBAR} = <b>${fmtFixed(d.comb.x)}${NBSP}${PANEL_M}</b> ` +
+      `(only the ${only} acts, so its location is the combined one)${panelWhere(d.comb.x)}`;
+  }
+  const num = `${panelPar(d.rect.F, PANEL_N)} × ${fmtFixed(d.rect.x)}${NBSP}${PANEL_M} + ${panelPar(d.tri.F, PANEL_N)} × ${fmtFixed(d.tri.x)}${NBSP}${PANEL_M}`;
+  const exact = panelNeedsExact(d) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+  return `${name}: ${sum}, at ${PANEL_XBAR} = (${num}) / ${panelPar(d.comb.F, PANEL_N)} = <b>${fmtFixed(d.comb.x)}${NBSP}${PANEL_M}</b>` +
+    `${panelWhere(d.comb.x)}${exact}`;
+}
+
+// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'note', html }]. Pure.
+function calcLines(s) {
+  const d = derive(s);
+  const lines = [
+    { key: 'rect', html: panelRect(d, s) },
+    { key: 'tri', html: panelTri(d, s) },
+    { key: 'comb', html: panelComb(d) }
+  ];
+  if (d.couple) {
+    lines.push({
+      key: 'note',
+      html: 'Equal and opposite forces that act at different places do not cancel their turning effect: ' +
+        'together they leave a couple, which no single force can replace.'
+    });
+  }
+  return lines;
+}
+
+// Writes the lines into el, and only when the text changed (a screen reader hears no repeat).
+function createPanel(el) {
+  let last = null;
+  return {
+    render(s) {
+      const html = calcLines(s).map(l => `<div class="cl ${l.key}">${l.html}</div>`).join('');
+      if (html === last) return;
+      last = html;
+      el.innerHTML = html;
+    }
+  };
+}
+
+// ===== controls.js =====
+
+
+// Pure: what the controls show for state s.
+function controlsView(s) {
+  return { rText: fmt(s.r), tText: fmt(s.t), rZero: s.r === 0, tZero: s.t === 0, peak: s.peak };
+}
+
+// Keys that move a range input; a pointer drag is everything else.
+const CONTROLS_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
+
+function controlsSetText(node, str) {
+  if (node.textContent !== str) node.textContent = str;
+}
+
+// root: the controls container (key and pointer events are heard here).
+// parts: { rSlider, tSlider, peakA, peakB, rReadout, tReadout, rZero, tZero } -- the page's elements.
+// Binds the sliders and the peak buttons to state; render(s) shows state s in them.
+function createControls(root, state, parts) {
+  const { rSlider, tSlider, peakA, peakB, rReadout, tReadout, rZero, tZero } = parts;
+  let viaKeyboard = false;
+
+  function showSlider(slider, readout, zeroLabel, text, value, zero) {
+    // Move the thumb when the state's value differs from it: a snap, or the keyboard's jump past the zero zone.
+    if (Number(slider.value) !== value) slider.value = String(value);
+    slider.setAttribute('aria-valuetext', `${text}${NBSP}N/m`);
+    controlsSetText(readout, text);
+    if (zeroLabel) zeroLabel.classList.toggle('on', zero);
+  }
+
+  function showPeak(button, on) {
+    button.classList.toggle('sel', on);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function render(s) {
+    const v = controlsView(s);
+    showSlider(rSlider, rReadout, rZero, v.rText, s.r, v.rZero);
+    showSlider(tSlider, tReadout, tZero, v.tText, s.t, v.tZero);
+    showPeak(peakA, v.peak === 'A');
+    showPeak(peakB, v.peak === 'B');
+  }
+
+  // A key marks the NEXT input event as a keyboard one; that event clears the mark. A key that
+  // changes nothing (a slider already at its end) fires no input, so a key release, a pointer
+  // press and losing focus clear it too, or the next drag would be taken for a key press.
+  const clearKey = () => { viaKeyboard = false; };
+  root.addEventListener('keydown', (e) => { if (CONTROLS_KEYS.includes(e.key)) viaKeyboard = true; });
+  root.addEventListener('keyup', clearKey);
+  root.addEventListener('pointerdown', clearKey);
+  root.addEventListener('focusout', clearKey);
+  if (typeof window !== 'undefined') window.addEventListener('blur', clearKey);
+
+  function onInput(set) {
+    const kb = viaKeyboard;
+    viaKeyboard = false;
+    set(kb);
+    render(state.getState());   // the state may not have changed (a snap back to 0): still put the thumb right
+  }
+  rSlider.addEventListener('input', () => onInput((kb) => state.setR(Number(rSlider.value), kb)));
+  tSlider.addEventListener('input', () => onInput((kb) => state.setT(Number(tSlider.value), kb)));
+  peakA.addEventListener('click', () => state.setPeak('A'));
+  peakB.addEventListener('click', () => state.setPeak('B'));
+
+  return { render };
+}
+
+// ===== detail-layout.js =====
+
+
+
+
+// Geometry of the detail page's figure (the net load on AB), all in viewBox units with y growing downward.
+// Pure: no DOM. Sign convention as the main page: a positive (down) load sits ABOVE the beam, a negative one BELOW.
+// `band` is the room above and below the beam; labelClear is how close to the beam's middle a label may come;
+// labelADx / labelBDx are the label text's distances left of the wall (a) and right of B (b).
+const DETAIL = {
+  vb: { w: 960, h: 356 }, x0: 250, px: 130, beamY: 150, unit: 0.3, band: 120,
+  labelClear: 40, labelADx: 44, labelBDx: 34, leaderGap: 4, dimY: 318, captionY: 346, arrows: 8, minArrow: 8
+};
+
+// metres from A -> viewBox x
+function detailX(m) {
+  return DETAIL.x0 + m * DETAIL.px;
+}
+
+// The load's signed heights at A and at B, w_A and w_B in N/m. `+ 0` turns a -0 into 0.
+function detailHeights(s) {
+  return { wA: loadAt(s, 0) + 0, wB: loadAt(s, LOADED_L) + 0 };
+}
+
+// y of the outer edge of a load of height w: above the top face for w > 0, below the bottom face for w < 0.
+// w = 0 sits on the top face.
+function detailEdgeY(w) {
+  if (w > 0) return DETAIL.beamY - w * DETAIL.unit;
+  if (w < 0) return DETAIL.beamY + BEAM_H - w * DETAIL.unit;
+  return DETAIL.beamY;
+}
+
+// The net load as polygons ([x, y] corners): one for same-sign heights (a zero end gives a triangle on the face
+// the load sits on), two triangles split at the zero crossing for opposite signs, none when both are zero.
+function detailOutline(s) {
+  const { wA, wB } = detailHeights(s);
+  if (wA === 0 && wB === 0) return [];
+  const xA = detailX(0);
+  const xB = detailX(LOADED_L);
+  const top = DETAIL.beamY;
+  const bot = DETAIL.beamY + BEAM_H;
+  if (wA * wB < 0) {
+    const xc = xA + (xB - xA) * wA / (wA - wB);
+    const faceA = wA > 0 ? top : bot;
+    const faceB = wB > 0 ? top : bot;
+    const first = [[xA, faceA], [xA, detailEdgeY(wA)], [xc, faceA]];
+    const second = [[xc, faceB], [xB, detailEdgeY(wB)], [xB, faceB]];
+    return [first, second];
+  }
+  const face = wA + wB > 0 ? top : bot;
+  const edge = w => (w === 0 ? face : detailEdgeY(w));
+  const poly = [];
+  for (const p of [[xA, face], [xA, edge(wA)], [xB, edge(wB)], [xB, face]]) {
+    const last = poly[poly.length - 1];
+    if (!last || last[0] !== p[0] || last[1] !== p[1]) poly.push(p);
+  }
+  return [poly];
+}
+
+// The net-intensity arrows, as on the main page's top figure: one at the middle of each eighth of AB,
+// length |w| times the scale, left out when shorter than minArrow.
+function detailArrows(s) {
+  const out = [];
+  for (let i = 0; i < DETAIL.arrows; i++) {
+    const m = (i + 0.5) * LOADED_L / DETAIL.arrows;
+    const w = loadAt(s, m);
+    const len = Math.abs(w) * DETAIL.unit;
+    if (len < DETAIL.minArrow) continue;
+    out.push(layoutArrow(detailX(m), w, len, DETAIL.beamY));
+  }
+  return out;
+}
+
+// The label's y: the edge y, unless the edge is within labelClear of the beam's middle, then labelClear above
+// the middle (edge at or above it) or below it (edge below). Never decreases as the height decreases.
+function detailLabelY(edgeY) {
+  const mid = DETAIL.beamY + BEAM_H / 2;
+  if (Math.abs(edgeY - mid) >= DETAIL.labelClear) return edgeY;
+  return edgeY <= mid ? mid - DETAIL.labelClear : mid + DETAIL.labelClear;
+}
+
+// The two height labels with their dotted leaders: a to the left of the wall (text right-aligned),
+// b to the right of B (text left-aligned). `edge` is the outline corner the leader ends at: always a vertex of
+// detailOutline(s) (or on the top face when both heights are 0 and nothing is drawn).
+function detailLabels(s) {
+  const { wA, wB } = detailHeights(s);
+  const xA = detailX(0);
+  const xB = detailX(LOADED_L);
+  // a zero height's corner is on the face the outline uses (bottom when the load is below the beam, else top)
+  const zeroY = wA + wB < 0 ? DETAIL.beamY + BEAM_H : DETAIL.beamY;
+  const eA = wA === 0 ? zeroY : detailEdgeY(wA);
+  const eB = wB === 0 ? zeroY : detailEdgeY(wB);
+  const yA = detailLabelY(eA);
+  const yB = detailLabelY(eB);
+  const ax = xA - DETAIL.labelADx;
+  const bx = xB + DETAIL.labelBDx;
+  return {
+    a: {
+      name: 'w', sub: 'A', value: `${fmt(wA)}${NBSP}N/m`, x: ax, y: yA, anchor: 'end',
+      edge: { x: xA, y: eA }, leader: { x1: ax + 4, y1: yA, x2: xA, y2: eA }
+    },
+    b: {
+      name: 'w', sub: 'B', value: `${fmt(wB)}${NBSP}N/m`, x: bx, y: yB, anchor: 'start',
+      edge: { x: xB, y: eB }, leader: { x1: xB + DETAIL.leaderGap, y1: eB, x2: bx - 4, y2: yB }
+    }
+  };
+}
+
+// ===== detail-scene.js =====
+
+
+
+
+
+
+// Drawing style only: every position and length comes from detail-layout.js.
+const DETAIL_LABEL = 20;          // the w_A / w_B labels (15 px at the figure's 740 px width)
+const DETAIL_SUB = 16;            // their subscript letter
+const DETAIL_SUB_DY = 5;          // the subscript sits this far below the baseline; the value comes back up
+const DETAIL_CAPTION = 16;
+const DETAIL_FILL = 0.1;          // fill opacity of the net-load outline
+const DETAIL_TICK = 5;
+const DETAIL_DOT_R = 3.5;
+const DETAIL_LEADER_DASH = '3 3';
+
+// One net-load polygon (its [x, y] corners, closed with Z).
+function detailDrawOutline(parent, poly) {
+  const d = `M${poly.map(p => p.join(' ')).join(' L')} Z`;
+  return el('path', { class: 'g', d, fill: COLORS.ink, 'fill-opacity': DETAIL_FILL, stroke: COLORS.ink, 'stroke-width': 2 }, parent);
+}
+
+// A height label "w", subscript letter, " = value": three runs on one text node, so it anchors as one string.
+// dominant-baseline centres it vertically on the label y, which is where the leader ends.
+function detailDrawLabel(parent, lab) {
+  const node = sceneText(parent, lab.x, lab.y, lab.name, {
+    size: DETAIL_LABEL, weight: 700, fill: COLORS.comb, anchor: lab.anchor
+  });
+  node.setAttribute('dominant-baseline', 'central');
+  const sub = el('tspan', { 'font-size': DETAIL_SUB, dy: DETAIL_SUB_DY }, node);
+  sub.textContent = lab.sub;
+  const val = el('tspan', { 'font-size': DETAIL_LABEL, dy: -DETAIL_SUB_DY }, node);
+  val.textContent = ` = ${lab.value}`;
+  return node;
+}
+
+// The dimension line AB (ticks at A and B) and its caption.
+function detailDrawDimension(parent) {
+  const xA = detailX(0);
+  const xB = detailX(LOADED_L);
+  const y = DETAIL.dimY;
+  const g = el('g', { class: 'g' }, parent);
+  el('line', { x1: xA, y1: y, x2: xB, y2: y, stroke: COLORS.outline }, g);
+  el('line', { x1: xA, y1: y - DETAIL_TICK, x2: xA, y2: y + DETAIL_TICK, stroke: COLORS.outline }, g);
+  el('line', { x1: xB, y1: y - DETAIL_TICK, x2: xB, y2: y + DETAIL_TICK, stroke: COLORS.outline }, g);
+  sceneText(parent, (xA + xB) / 2, DETAIL.captionY, `AB: L = 2${NBSP}m (loaded)`, { size: DETAIL_CAPTION, anchor: 'middle' });
+}
+
+// render(s) clears the figure and redraws it from s = { r, t, peak } alone: the net load on AB with its
+// two end heights labelled. The beam is drawn after the leaders so the wall covers one that crosses it.
+function createDetailScene(svg) {
+  return {
+    render(s) {
+      clear(svg);
+      for (const poly of detailOutline(s)) detailDrawOutline(svg, poly);
+      for (const a of detailArrows(s)) sceneArrow(svg, a, COLORS.ink, 1.4);
+      const labels = detailLabels(s);
+      const both = [labels.a, labels.b];
+      for (const lab of both) {
+        const l = lab.leader;
+        el('line', {
+          class: 'g leader', x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2,
+          stroke: COLORS.comb, 'stroke-width': 1.4, 'stroke-dasharray': DETAIL_LEADER_DASH
+        }, svg);
+      }
+      sceneBeam(svg, DETAIL.x0, DETAIL.beamY, DETAIL.px);
+      for (const lab of both) {
+        el('circle', { class: 'g dot', cx: lab.edge.x, cy: lab.edge.y, r: DETAIL_DOT_R, fill: COLORS.comb }, svg);
+      }
+      for (const lab of both) detailDrawLabel(svg, lab);
+      detailDrawDimension(svg);
+    }
+  };
+}
+
+// ===== detail-math.js =====
+
+
+
+
+
+
+// The detail page's three calculation blocks as pure text (no DOM). Every line is an HTML string
+// built from fixed pieces and numbers that come from fmt / fmtFixed, so no URL text can reach it.
+// A variable is <i class="v">F</i><sub>rect</sub>; detailPlain turns that back into F_rect.
+// The set-up lines hold no digit at all (only the fractions ½, ⅓, ⅔); numbers appear in the plug lines.
+
+// Plain text of a line: tags stripped, a subscript written as _x, nothing else touched.
+function detailPlain(html) {
+  return html.replace(/<sub>([^<]*)<\/sub>/g, '_$1').replace(/<[^>]*>/g, '');
+}
+
+const DETAIL_DOT = ' · ';
+
+function detailV(base, sub) {
+  const v = `<i class="v">${base}</i>`;
+  return sub ? `${v}<sub>${sub}</sub>` : v;
+}
+
+const detailL = () => detailV('L');
+const detailUnit = (n, unit) => `${n}${NBSP}${unit}`;
+const detailLength = () => detailUnit(fmt(LOADED_L), 'm');
+
+// The load's heights at A and B named by the end where the triangle is zero / tall.
+function detailEnds(peak) {
+  return peak === 'A' ? { zero: 'B', tall: 'A' } : { zero: 'A', tall: 'B' };
+}
+
+function detailRect(d, s) {
+  const { zero } = detailEnds(s.peak);
+  const wRect = detailV('w', 'rect'), fRect = detailV('F', 'rect'), rRect = detailV('r', 'rect');
+  const wEnd = detailV('w', zero);
+  const L = detailL();
+  const setup = [
+    `The triangle is zero at ${zero}, so the rectangle's height is the load's height at ${zero}: ${wRect} = ${wEnd}.`,
+    `The equivalent force is the area under the rectangle: ${fRect} = ${wRect}${DETAIL_DOT}${L}.`,
+    `It acts at the centre of the rectangle, measured from A: ${rRect} = ½${DETAIL_DOT}${L}.`
+  ];
+  const plug = [
+    `${wRect} = ${wEnd} = ${detailUnit(fmt(s.r), 'N/m')}, ${L} = ${detailLength()}`,
+    `${fRect} = ${wRect}${DETAIL_DOT}${L} = ${panelPar(s.r, 'N/m')}${DETAIL_DOT}${detailLength()} = ${detailUnit(fmt(d.rect.F), 'N')}`,
+    `${rRect} = ½${DETAIL_DOT}${L} = ½${DETAIL_DOT}${detailLength()} = ${detailUnit(fmtFixed(LOADED_L / 2), 'm')}`
+  ];
+  const notes = d.rect.F === 0
+    ? [`There is no rectangular load, so ${fRect} = ${detailUnit('0', 'N')} and it adds no torque.`]
+    : [];
+  return { key: 'rect', title: 'Calculating the rectangular loading', setup, plug, notes };
+}
+
+function detailTri(d, s) {
+  const { tall } = detailEnds(s.peak);
+  const { wA, wB } = detailHeights(s);
+  const wTri = detailV('w', 'tri'), fTri = detailV('F', 'tri'), rTri = detailV('r', 'tri');
+  const wTall = s.peak === 'A' ? wA : wB;
+  const wOther = s.peak === 'A' ? wB : wA;
+  const nameTall = detailV('w', tall), nameOther = detailV('w', s.peak === 'A' ? 'B' : 'A');
+  const L = detailL();
+  const where = s.peak === 'A' ? `⅓${DETAIL_DOT}${L}` : `⅔${DETAIL_DOT}${L}`;
+  const centroid = s.peak === 'A'
+    ? `${rTri} = ⅓${DETAIL_DOT}${L}`
+    : `${rTri} = ${L} − ⅓${DETAIL_DOT}${L} = ⅔${DETAIL_DOT}${L}`;
+  const setup = [
+    `The triangle's height is the rest of the load: ${wTri} = ${nameTall} − ${nameOther}.`,
+    `The equivalent force is the area under the triangle, half of base times height: ${fTri} = ½${DETAIL_DOT}${wTri}${DETAIL_DOT}${L}.`,
+    `It acts at the centroid, one third of ${L} in from the tall end ${tall}, so measured from A: ${centroid}.`
+  ];
+  const plug = [
+    `${detailV('w', 'A')} = ${detailUnit(fmt(wA), 'N/m')}, ${detailV('w', 'B')} = ${detailUnit(fmt(wB), 'N/m')}, ${L} = ${detailLength()}`,
+    `${wTri} = ${nameTall} − ${nameOther} = ${panelPar(wTall, 'N/m')} − ${panelPar(wOther, 'N/m')} = ${detailUnit(fmt(wTall - wOther), 'N/m')}`,
+    `${fTri} = ½${DETAIL_DOT}${wTri}${DETAIL_DOT}${L} = ½${DETAIL_DOT}${panelPar(wTall - wOther, 'N/m')}${DETAIL_DOT}${detailLength()} = ${detailUnit(fmt(d.tri.F), 'N')}`,
+    `${rTri} = ${where} = ${s.peak === 'A' ? '⅓' : '⅔'}${DETAIL_DOT}${detailLength()} = ${detailUnit(fmtFixed(s.peak === 'A' ? LOADED_L / 3 : 2 * LOADED_L / 3), 'm')}`
+  ];
+  const notes = d.tri.F === 0
+    ? [`There is no triangular load, so ${fTri} = ${detailUnit('0', 'N')} and it adds no torque.`]
+    : [];
+  return { key: 'tri', title: 'Calculating the triangular loading', setup, plug, notes };
+}
+
+function detailComb(d, s) {
+  const fRect = detailV('F', 'rect'), fTri = detailV('F', 'tri'), fEq = detailV('F', 'equiv');
+  const rRect = detailV('r', 'rect'), rTri = detailV('r', 'tri'), rEq = detailV('r', 'equiv');
+  const tRect = detailV('τ', 'rect'), tTri = detailV('τ', 'tri'), tEq = detailV('τ', 'equiv');
+  const F = detailV('F'), r = detailV('r'), tau = detailV('τ');
+  const formula = `(${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}) / ${fEq}`;
+  const setup = [
+    `The single equivalent force replaces both loads, so it carries their total force: ${fEq} = ${fRect} + ${fTri}.`,
+    `It must also give the same torque about A as the loads it replaces. A force ${F} at a distance ${r} from A gives a torque ${tau} = ${r}${DETAIL_DOT}${F} (downward forces positive).`,
+    `${tEq} = ${tRect} + ${tTri}`,
+    `${rEq}${DETAIL_DOT}${fEq} = ${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}`,
+    `Solving for the location: ${rEq} = ${formula}.`
+  ];
+  const noLoad = d.rect.F === 0 && d.tri.F === 0;
+  // The two parts' locations are fixed by the geometry even when a part carries no force (its x in derive is null).
+  const xRect = LOADED_L / 2;
+  const xTri = s.peak === 'A' ? LOADED_L / 3 : 2 * LOADED_L / 3;
+  const given = noLoad
+    ? `${fRect} = ${detailUnit('0', 'N')}, ${fTri} = ${detailUnit('0', 'N')}`
+    : `${fRect} = ${detailUnit(fmt(d.rect.F), 'N')}, ${fTri} = ${detailUnit(fmt(d.tri.F), 'N')}, ` +
+      `${rRect} = ${detailUnit(fmtFixed(xRect), 'm')}, ${rTri} = ${detailUnit(fmtFixed(xTri), 'm')}`;
+  const plug = [
+    given,
+    `${fEq} = ${fRect} + ${fTri} = ${panelPar(d.rect.F, 'N')} + ${panelPar(d.tri.F, 'N')} = ${detailUnit(fmt(d.comb.F), 'N')}`
+  ];
+  const notes = [];
+  if (noLoad) {
+    notes.push(`There is no load, so ${fEq} = ${detailUnit('0', 'N')} and there is nothing to replace.`);
+  } else if (d.comb.F === 0) {
+    notes.push(`${fEq} = ${detailUnit('0', 'N')}: the two loads leave a couple, so no single force replaces them and there is no ${rEq}.`);
+  } else {
+    // panelNeedsExact reads both locations, so a part with no force gets its geometric location here.
+    const full = { ...d, rect: { F: d.rect.F, x: xRect }, tri: { F: d.tri.F, x: xTri } };
+    const exact = panelNeedsExact(full) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+    const numbers = `(${detailUnit(fmtFixed(xRect), 'm')}${DETAIL_DOT}${panelPar(d.rect.F, 'N')} + ${detailUnit(fmtFixed(xTri), 'm')}${DETAIL_DOT}${panelPar(d.tri.F, 'N')}) / ${panelPar(d.comb.F, 'N')}`;
+    plug.push(`${rEq} = ${formula} = ${numbers} = ${detailUnit(fmtFixed(d.comb.x), 'm')}${panelWhere(d.comb.x)}${exact}`);
+  }
+  return { key: 'comb', title: 'Calculating the combined loading', setup, plug, notes };
+}
+
+// s = { r, t, peak } -> the three blocks, in order. Pure; derives, stores nothing.
+function detailBlocks(s) {
+  const d = derive(s);
+  return [detailRect(d, s), detailTri(d, s), detailComb(d, s)];
+}
+
+// ===== detail-app.js =====
+
+
+
+
+
+
+
+// One block's HTML: the set-up lines, then the plug-in lines (highlighted), then any notes.
+// Every line comes from detailBlocks, never from the link.
+function detailBodyHtml(b) {
+  return [
+    ...b.setup.map(l => `<div class="step setup">${l}</div>`),
+    ...b.plug.map(l => `<div class="plug">${l}</div>`),
+    ...b.notes.map(l => `<div class="note">${l}</div>`)
+  ].join('');
+}
+
+// Everything is looked up by id here, once; the modules get the elements, never the document.
+function appStart() {
+  document.title = 'Distributed load on a beam: detailed calculation';
+  const state = createState();
+  const scene = createDetailScene(document.getElementById('detail-fig'));
+  const bodies = {
+    rect: document.getElementById('body-rect'),
+    tri: document.getElementById('body-tri'),
+    comb: document.getElementById('body-comb')
+  };
+  const back = document.getElementById('back-link');
+  const controls = createControls(document.getElementById('controls'), state, {
+    rSlider: document.getElementById('r-slider'),
+    tSlider: document.getElementById('t-slider'),
+    peakA: document.getElementById('peak-a'),
+    peakB: document.getElementById('peak-b'),
+    rReadout: document.getElementById('r-readout'),
+    tReadout: document.getElementById('t-readout'),
+    rZero: document.getElementById('r-zero'),
+    tZero: document.getElementById('t-zero')
+  });
+
+  // Presets from the link apply once, before the first render. Only the fields the link set.
+  const presets = parsePresets(location.search);
+  const fields = {};
+  for (const k of ['r', 't', 'peak']) if (presets[k] !== undefined) fields[k] = presets[k];
+  state.set(fields);
+  const note = describePresets(presets);
+  const link = document.getElementById('from-link');
+  link.textContent = note;            // text only: the link's own text can never become markup
+  link.hidden = note === '';
+
+  // What each body shows now. Rewriting a body only when its text changed keeps a reader's text
+  // selection and a screen reader's place while a slider moves something that body does not use.
+  const shown = { rect: null, tri: null, comb: null };
+  function sync() {
+    const s = state.getState();
+    scene.render(s);
+    for (const b of detailBlocks(s)) {
+      const html = detailBodyHtml(b);
+      if (html !== shown[b.key]) {
+        shown[b.key] = html;
+        bodies[b.key].innerHTML = html;
+      }
+    }
+    back.setAttribute('href', MAIN_PAGE + presetQuery(s));
+    controls.render(s);
+  }
+  state.subscribe(sync);
+  sync();
+}
+
+appStart();
+
+})();
+</script>
+</body>
+</html>

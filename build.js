@@ -9,7 +9,17 @@ const root = dirname(fileURLToPath(import.meta.url));
 const SRC = join(root, 'src');
 
 // Dependency order. app.js runs last because it touches the DOM immediately.
-export const MODULES = ['physics.js', 'format.js', 'svg.js', 'state.js', 'presets.js', 'layout.js', 'scene.js', 'panel.js', 'controls.js', 'app.js'];
+export const MODULES = ['physics.js', 'format.js', 'svg.js', 'state.js', 'presets.js', 'link.js', 'layout.js', 'scene.js', 'panel.js', 'controls.js', 'app.js'];
+
+// The second page shares everything the main page shows (same state, controls, figure parts) and adds
+// its own modules; detail-app.js runs last for the same reason app.js does.
+export const DETAIL_MODULES = ['physics.js', 'format.js', 'svg.js', 'state.js', 'presets.js', 'link.js', 'layout.js', 'scene.js', 'panel.js', 'controls.js', 'detail-layout.js', 'detail-scene.js', 'detail-math.js', 'detail-app.js'];
+
+// One entry per output file: its template, its stylesheets (concatenated in this order) and its module list.
+export const PAGES = [
+  { name: 'main', out: 'distributed_load_beam.html', template: 'index.template.html', css: ['styles.css'], modules: MODULES },
+  { name: 'detail', out: 'distributed_load_beam_detail.html', template: 'detail.template.html', css: ['styles.css', 'detail.css'], modules: DETAIL_MODULES }
+];
 
 // Anchored at column 0 on purpose. Every top-level declaration in src/ starts
 // there, and matching leading whitespace too would flag ordinary function-local
@@ -100,14 +110,13 @@ export function scanForDuplicates(code, moduleName, seen) {
   return seen;
 }
 
-// outDir lets a test point the build at a scratch directory outside the repo
-// (see test/build.test.js) instead of always writing into the committed
-// dist/. The real CLI invocation at the bottom of this file calls main() with
-// no argument, which keeps writing to dist/ exactly as before.
-export function main(outDir) {
+// Builds one page to a string: the checks that need the page alone all happen here, so a page that
+// fails never reaches the disk (main() writes only after every page has passed).
+function buildPage(page) {
+  // Every page is its own scope after inlining, so the duplicate-name scan starts afresh for each.
   const seen = new Map();
   const parts = [];
-  for (const m of MODULES) {
+  for (const m of page.modules) {
     const code = readFileSync(join(SRC, m), 'utf8');
     scanForDuplicates(code, m, seen);
     parts.push(`// ===== ${m} =====\n` + strip(code));
@@ -123,18 +132,18 @@ export function main(outDir) {
     new Script(js);
   } catch (err) {
     throw new Error(
-      `Build failed: the assembled bundle does not parse as JavaScript.\n  - ${err.message}`);
+      `Build failed: the ${page.name} page's assembled bundle does not parse as JavaScript.\n  - ${err.message}`);
   }
 
-  const css = readFileSync(join(SRC, 'styles.css'), 'utf8');
+  const css = page.css.map(f => readFileSync(join(SRC, f), 'utf8')).join('\n');
 
-  let html = readFileSync(join(SRC, 'index.template.html'), 'utf8');
+  let html = readFileSync(join(SRC, page.template), 'utf8');
   if (!html.includes('<!--INLINE_CSS-->') || !html.includes('<!--INLINE_JS-->')) {
-    throw new Error('index.template.html is missing one of its inline markers');
+    throw new Error(`${page.template} is missing one of its inline markers`);
   }
   // E2: a plain string replacement pattern expands $&, $`, $', $$ and $n
   // sequences found in the REPLACEMENT text. A function replacement is spliced
-  // in verbatim instead, so a `$&` anywhere in styles.css or any module can no
+  // in verbatim instead, so a `$&` anywhere in the CSS or any module can no
   // longer silently corrupt the bundle.
   html = html.replace('<!--INLINE_CSS-->', () => `<style>\n${css}\n</style>`)
              .replace('<!--INLINE_JS-->', () => `<script>\n${js}\n</script>`);
@@ -153,13 +162,24 @@ export function main(outDir) {
   if (/<script[^>]+src=/.test(html)) problems.push('an external script tag is present');
   if (/<link[^>]+href=/.test(html)) problems.push('an external stylesheet is present');
   if (html.length > 250_000) problems.push(`output is ${html.length} bytes, over the 250 KB budget`);
-  if (problems.length) throw new Error('Build failed:\n  - ' + problems.join('\n  - '));
+  if (problems.length) throw new Error(`Build failed (${page.name} page):\n  - ` + problems.join('\n  - '));
+  return html;
+}
+
+// outDir lets a test point the build at a scratch directory outside the repo
+// (see test/build.test.js) instead of always writing into the committed
+// dist/. The real CLI invocation at the bottom of this file calls main() with
+// no argument, which keeps writing to dist/ exactly as before.
+export function main(outDir) {
+  const built = PAGES.map(page => ({ page, html: buildPage(page) }));
 
   const dir = outDir || join(root, 'dist');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'distributed_load_beam.html'), html);
-  const label = outDir ? join(outDir, 'distributed_load_beam.html') : 'dist/distributed_load_beam.html';
-  console.log(`built ${label}  (${html.length} bytes, ${MODULES.length} modules)`);
+  for (const { page, html } of built) {
+    writeFileSync(join(dir, page.out), html);
+    const label = outDir ? join(outDir, page.out) : `dist/${page.out}`;
+    console.log(`built ${label}  (${html.length} bytes, ${page.modules.length} modules)`);
+  }
 }
 
 // E4: run only when this file is the program node was invoked on, so importing

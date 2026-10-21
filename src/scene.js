@@ -21,14 +21,14 @@ const SCENE_CARD_STROKE = 0.45;   // the column card's frame opacity
 const SCENE_CARD_HEAD = 0.12;     // the heading band's tint
 
 // A text node with its class set (svg.js's text() takes no class option).
-function sceneText(parent, x, y, str, opts, cls = 't') {
+export function sceneText(parent, x, y, str, opts, cls = 't') {
   const node = text(parent, x, y, str, { size: SCENE_TEXT, ...opts });
   node.setAttribute('class', cls);
   return node;
 }
 
 // One arrow group: shaft line plus head path, the head's tip at (a.x, a.yHead).
-function sceneArrow(parent, a, color, width) {
+export function sceneArrow(parent, a, color, width) {
   const dir = a.yHead > a.yTail ? 1 : -1;
   const headLen = Math.min(SCENE_HEAD_MAX, Math.abs(a.yHead - a.yTail) * 0.6);
   const half = width * 1.6 + 1;
@@ -41,7 +41,7 @@ function sceneArrow(parent, a, color, width) {
 
 // A beam copy starting at x0 with its top face at y, `px` units per metre,
 // a hatched wall at A and A, B, C circles centred on the beam's mid-line.
-function sceneBeam(parent, x0, y, px) {
+export function sceneBeam(parent, x0, y, px) {
   el('rect', { class: 'g', x: x0, y, width: BEAM_L * px, height: BEAM_H, fill: COLORS.beam, stroke: COLORS.outline }, parent);
   const wallTop = y - SCENE_WALL_OVER;
   const wallH = BEAM_H + 2 * SCENE_WALL_OVER;

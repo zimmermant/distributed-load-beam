@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { stubElement } from './stub-dom.js';
 
-const IDS = ['fig', 'calc', 'controls', 'r-slider', 't-slider', 'peak-a', 'peak-b', 'r-readout', 't-readout', 'r-zero', 't-zero', 'from-link'];
+const IDS = ['fig', 'calc', 'controls', 'r-slider', 't-slider', 'peak-a', 'peak-b', 'r-readout', 't-readout', 'r-zero', 't-zero', 'from-link', 'detail-link'];
 let boots = 0;
 
 // Runs src/app.js against a stub page, as the browser does on load: the module wires everything
@@ -11,6 +11,7 @@ async function boot(search) {
   const els = {};
   for (const id of IDS) els[id] = stubElement(id === 'fig' ? 'svg' : 'div');
   els['from-link'].hidden = true;
+  els['detail-link'] = stubElement('a');
   globalThis.document = {
     title: '',
     getElementById: (id) => { assert.ok(els[id], `app.js looked up #${id}, which the stub page lacks`); return els[id]; },
@@ -81,4 +82,25 @@ test('moving a slider or pressing a peak button redraws the figure, the calculat
   assert.ok(els.calc.innerHTML.includes('the peak is at A'));
   assert.equal(els['peak-a'].attrs['aria-pressed'], 'true');
   assert.equal(els['peak-b'].attrs['aria-pressed'], 'false');
+});
+
+test('the detailed-calculation link carries the sliders: set at boot, and following every slider input and peak click', async () => {
+  const { els } = await boot('');
+  const link = els['detail-link'];
+  assert.equal(link.attrs.href, 'distributed_load_beam_detail.html?r=100&t=100&peak=B');
+  els['r-slider'].value = '-50';
+  els['r-slider'].fire('input');
+  assert.equal(link.attrs.href, 'distributed_load_beam_detail.html?r=-50&t=100&peak=B');
+  els['t-slider'].value = '25';
+  els['t-slider'].fire('input');
+  assert.equal(link.attrs.href, 'distributed_load_beam_detail.html?r=-50&t=25&peak=B');
+  els['peak-a'].fire('click');
+  assert.equal(link.attrs.href, 'distributed_load_beam_detail.html?r=-50&t=25&peak=A');
+  assert.equal(link.textContent, '', 'the link text is never rewritten by the app');
+  assert.equal(els.calc.children.includes(link), false, 'the link is not inside #calc');
+});
+
+test('the detailed-calculation link follows the link parameters at boot', async () => {
+  const { els } = await boot('?r=-190&t=abc&peak=A');
+  assert.equal(els['detail-link'].attrs.href, 'distributed_load_beam_detail.html?r=-190&t=100&peak=A');
 });

@@ -12,7 +12,7 @@ const PANEL_XBAR = 'x̄';
 const PANEL_N = 'N';
 const PANEL_NPM = 'N/m';
 const PANEL_M = 'm';
-function panelPar(n, unit) {
+export function panelPar(n, unit) {
   const text = fmt(n);
   return text.startsWith(MINUS) ? `(${text}${NBSP}${unit})` : `${text}${NBSP}${unit}`;
 }
@@ -33,14 +33,14 @@ function panelTri(d, s) {
 }
 
 // A word when the combined force acts off the beam (judged on the printed value).
-function panelWhere(x) {
+export function panelWhere(x) {
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
   if (shown < 0) return ' (off the beam, left of the wall)';
   return shown > BEAM_L ? ' (off the beam, beyond C)' : '';
 }
 
 // True when working the sum from the PRINTED (rounded) locations would not print the printed answer.
-function panelNeedsExact(d) {
+export function panelNeedsExact(d) {
   const shown = (v) => Number(fmtFixed(v));
   const again = (d.rect.F * shown(d.rect.x) + d.tri.F * shown(d.tri.x)) / d.comb.F;
   return fmtFixed(again) !== fmtFixed(d.comb.x);

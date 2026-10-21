@@ -3,6 +3,7 @@ import { createScene } from './scene.js';
 import { createPanel } from './panel.js';
 import { createControls } from './controls.js';
 import { parsePresets, describePresets } from './presets.js';
+import { DETAIL_PAGE, presetQuery } from './link.js';
 
 // Everything is looked up by id here, once; the modules get the elements, never the document.
 function appStart() {
@@ -31,11 +32,15 @@ function appStart() {
   link.textContent = note;            // text only: the link's own text can never become markup
   link.hidden = note === '';
 
+  // The link to the detailed page carries the sliders; it sits outside #calc, so rewriting #calc never touches it.
+  const more = document.getElementById('detail-link');
+
   function sync() {
     const s = state.getState();
     scene.render(s);
     panel.render(s);
     controls.render(s);
+    more.setAttribute('href', DETAIL_PAGE + presetQuery(s));
   }
   state.subscribe(sync);
   sync();
