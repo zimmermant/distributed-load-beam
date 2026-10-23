@@ -32,7 +32,8 @@ export function loadAt(s, x) {
   return s.r + s.t * frac;
 }
 
-// Equivalent forces: signed F (+ down) and x in m from A (null when F is 0).
+// Equivalent forces: signed F (+ up, − down) and x in m from A (null when F is 0), and the net moment M about A in N·m.
+// With F positive up and x to the right of A, a force's moment is x·F, counterclockwise positive.
 // The combined location comes from summing moments about A. The triangle's
 // moment is written as t*L*L/3 (peak B) or t*L*L/6 (peak A), which equals
 // F_tri * x_tri but keeps round numbers exact (e.g. -12 rather than -11.999...).
@@ -48,5 +49,5 @@ export function equivalents(s) {
   const tri = { F: triF, x: triF === 0 ? null : triX };
   const comb = { F: combF, x: combF === 0 ? null : (rectM + triM) / combF };
   const couple = combF === 0 && (rectF !== 0 || triF !== 0);
-  return { rect, tri, comb, couple };
+  return { rect, tri, comb, couple, M: rectM + triM + 0 };
 }

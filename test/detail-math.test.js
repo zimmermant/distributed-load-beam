@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import * as detailMathModule from '../src/detail-math.js';
 import { detailPlain, detailBlocks } from '../src/detail-math.js';
 import { derive } from '../src/state.js';
-import { panelNeedsExact } from '../src/panel.js';
-import { NBSP } from '../src/format.js';
+import { panelNeedsExact, panelMomentNeedsExact } from '../src/panel.js';
+import { NBSP, momentParts } from '../src/format.js';
 import { W_MAX, W_STEP, LOADED_L } from '../src/physics.js';
 import { NUMBER, bareNumbers, plainSpaceNumbers } from './unit-rule.js';
 
-const DEFAULT = { r: 100, t: 100, peak: 'B' };
+const DEFAULT = { r: -100, t: -100, peak: 'B' };   // both loads 100 N/m down (+ up)
 // Write the contract with plain spaces; a number-unit gap becomes a no-break space here.
 const U = (str) => str.replace(/(\d) (?=N\/m|N(?![A-Za-z/])|m(?![A-Za-z]))/g, `$1${NBSP}`);
 const plainOf = (lines) => lines.map(detailPlain);
@@ -49,34 +49,36 @@ test('default state: the exact contract, every line of the three blocks', () => 
     "It acts at the centre of the rectangle, measured from A: r_rect = ½ · L."
   ]);
   assert.deepEqual(plainOf(b.rect.plug), [
-    U('w_rect = w_A = 100 N/m, L = 2 m'),
-    U('F_rect = w_rect · L = 100 N/m · 2 m = 200 N'),
+    U('w_rect = w_A = −100 N/m, L = 2 m'),
+    U('F_rect = w_rect · L = (−100 N/m) · 2 m = −200 N'),
     U('r_rect = ½ · L = ½ · 2 m = 1.00 m')
   ]);
   assert.deepEqual(plainOf(b.tri.setup), [
     "The triangle's height is the rest of the load: w_tri = w_B − w_A.",
-    "The equivalent force is the area under the triangle, half of base times height: F_tri = ½ · w_tri · L.",
-    "It acts at the centroid, one third of L in from the tall end B, so measured from A: r_tri = L − ⅓ · L = ⅔ · L."
+    'The equivalent force is the area under the triangle, half of base times height: F_tri = ½ · w_tri · L.',
+    'It acts at the centroid, one third of L in from the tall end B, so measured from A: r_tri = L − ⅓ · L = ⅔ · L.'
   ]);
   assert.deepEqual(plainOf(b.tri.plug), [
-    U('w_A = 100 N/m, w_B = 200 N/m, L = 2 m'),
-    U('w_tri = w_B − w_A = 200 N/m − 100 N/m = 100 N/m'),
-    U('F_tri = ½ · w_tri · L = ½ · 100 N/m · 2 m = 100 N'),
+    U('w_A = −100 N/m, w_B = −200 N/m, L = 2 m'),
+    U('w_tri = w_B − w_A = (−200 N/m) − (−100 N/m) = −100 N/m'),
+    U('F_tri = ½ · w_tri · L = ½ · (−100 N/m) · 2 m = −100 N'),
     U('r_tri = ⅔ · L = ⅔ · 2 m = 1.33 m')
   ]);
   assert.deepEqual(plainOf(b.comb.setup), [
     'The single equivalent force replaces both loads, so it carries their total force: F_equiv = F_rect + F_tri.',
-    'It must also give the same torque about A as the loads it replaces. A force F at a distance r from A gives a torque τ = r · F (downward forces positive).',
-    'τ_equiv = τ_rect + τ_tri',
-    'r_equiv · F_equiv = r_rect · F_rect + r_tri · F_tri',
-    'Solving for the location: r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv.'
+    'It must also give the same moment about A as the loads it replaces. A force F at a distance r from A gives a moment M = r · F (upward forces and counterclockwise moments positive).',
+    'The net moment of the two loads about A: M_net = M_rect + M_tri = r_rect · F_rect + r_tri · F_tri',
+    'M_equiv = M_net, so r_equiv · F_equiv = r_rect · F_rect + r_tri · F_tri',
+    'Solving for the location: r_equiv = M_net / F_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv.'
   ]);
   assert.deepEqual(plainOf(b.comb.plug), [
-    U('F_rect = 200 N, F_tri = 100 N, r_rect = 1.00 m, r_tri = 1.33 m'),
-    U('F_equiv = F_rect + F_tri = 200 N + 100 N = 300 N'),
-    U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · 200 N + 1.33 m · 100 N) / 300 N = 1.11 m')
+    U('F_rect = −200 N, F_tri = −100 N, r_rect = 1.00 m, r_tri = 1.33 m'),
+    U('F_equiv = F_rect + F_tri = (−200 N) + (−100 N) = −300 N'),
+    U('M_net = r_rect · F_rect + r_tri · F_tri = 1.00 m · (−200 N) + 1.33 m · (−100 N) = −333.33 N·m (clockwise) (worked from the unrounded locations)'),
+    U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · (−200 N) + 1.33 m · (−100 N)) / (−300 N) = 1.11 m')
   ]);
   for (const k of ['rect', 'tri', 'comb']) assert.deepEqual(b[k].notes, []);
+  assert.ok(b.comb.plug[2].endsWith(' <span class="rnd">(worked from the unrounded locations)</span>'), 'the M_net note is a span of class rnd, the style hook');
 });
 
 test('peak at A swaps the end names in the rectangle and triangle blocks and the plug lines', () => {
@@ -99,6 +101,7 @@ test('peak at A swaps the end names in the rectangle and triangle blocks and the
   assert.deepEqual(plainOf(b.comb.plug), [
     U('F_rect = 200 N, F_tri = 100 N, r_rect = 1.00 m, r_tri = 0.67 m'),
     U('F_equiv = F_rect + F_tri = 200 N + 100 N = 300 N'),
+    U('M_net = r_rect · F_rect + r_tri · F_tri = 1.00 m · 200 N + 0.67 m · 100 N = +266.67 N·m (counterclockwise) (worked from the unrounded locations)'),
     U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · 200 N + 0.67 m · 100 N) / 300 N = 0.89 m')
   ]);
 });
@@ -125,25 +128,27 @@ test('a negative value is written in parentheses, unit inside, wherever it is an
   assert.equal(detailPlain(e.comb.plug[1]), U('F_equiv = F_rect + F_tri = (−200 N) + 200 N = 0 N'));
 });
 
-test('r = 0: the rectangle block is as usual with a note that it adds no torque (same for the triangle)', () => {
+test('r = 0: the rectangle block is as usual with a note that it adds no moment (same for the triangle)', () => {
   const b = blocksOf({ r: 0, t: 100, peak: 'B' });
   assert.deepEqual(plainOf(b.rect.plug), [
     U('w_rect = w_A = 0 N/m, L = 2 m'),
     U('F_rect = w_rect · L = 0 N/m · 2 m = 0 N'),
     U('r_rect = ½ · L = ½ · 2 m = 1.00 m')
   ]);
-  assert.deepEqual(plainOf(b.rect.notes), [U('There is no rectangular load, so F_rect = 0 N and it adds no torque.')]);
+  assert.deepEqual(plainOf(b.rect.notes), [U('There is no rectangular load, so F_rect = 0 N and it adds no moment.')]);
   assert.deepEqual(b.tri.notes, []);
   assert.deepEqual(b.comb.notes, []);
   assert.deepEqual(plainOf(b.comb.plug), [
     U('F_rect = 0 N, F_tri = 100 N, r_rect = 1.00 m, r_tri = 1.33 m'),
     U('F_equiv = F_rect + F_tri = 0 N + 100 N = 100 N'),
+    U('M_net = r_rect · F_rect + r_tri · F_tri = 1.00 m · 0 N + 1.33 m · 100 N = +133.33 N·m (counterclockwise) (worked from the unrounded locations)'),
     U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · 0 N + 1.33 m · 100 N) / 100 N = 1.33 m')
   ]);
   const c = blocksOf({ r: 100, t: 0, peak: 'B' });
-  assert.deepEqual(plainOf(c.tri.notes), [U('There is no triangular load, so F_tri = 0 N and it adds no torque.')]);
+  assert.deepEqual(plainOf(c.tri.notes), [U('There is no triangular load, so F_tri = 0 N and it adds no moment.')]);
   assert.equal(detailPlain(c.tri.plug[2]), U('F_tri = ½ · w_tri · L = ½ · 0 N/m · 2 m = 0 N'));
-  assert.equal(detailPlain(c.comb.plug[2]), U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · 200 N + 1.33 m · 0 N) / 200 N = 1.00 m'));
+  assert.equal(detailPlain(c.comb.plug[2]), U('M_net = r_rect · F_rect + r_tri · F_tri = 1.00 m · 200 N + 1.33 m · 0 N = +200 N·m (counterclockwise)'));
+  assert.equal(detailPlain(c.comb.plug[3]), U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · 200 N + 1.33 m · 0 N) / 200 N = 1.00 m'));
   assert.deepEqual(c.rect.notes, []);
 });
 
@@ -163,22 +168,23 @@ test('a zero part never trips the unrounded-locations note (its location is not 
   }
 });
 
-test('equal and opposite forces: a couple note, no r_equiv line', () => {
+test('equal and opposite forces: the couple keeps its moment, a couple note, no r_equiv line', () => {
   const b = blocksOf({ r: 100, t: -200, peak: 'B' });
   assert.deepEqual(plainOf(b.comb.plug), [
     U('F_rect = 200 N, F_tri = −200 N, r_rect = 1.00 m, r_tri = 1.33 m'),
-    U('F_equiv = F_rect + F_tri = 200 N + (−200 N) = 0 N')
+    U('F_equiv = F_rect + F_tri = 200 N + (−200 N) = 0 N'),
+    U('M_net = r_rect · F_rect + r_tri · F_tri = 1.00 m · 200 N + 1.33 m · (−200 N) = −66.67 N·m (clockwise) (worked from the unrounded locations)')
   ]);
-  assert.deepEqual(plainOf(b.comb.notes), [U('F_equiv = 0 N: the two loads leave a couple, so no single force replaces them and there is no r_equiv.')]);
+  assert.deepEqual(plainOf(b.comb.notes), [U('F_equiv = 0 N: the two loads leave a couple, a moment M_net with no net force, so no single force replaces them and there is no r_equiv.')]);
   assert.deepEqual(b.rect.notes, []);
   assert.deepEqual(b.tri.notes, []);
 });
 
 test('no load at all: a note in each block and no r_equiv line', () => {
   const b = blocksOf({ r: 0, t: 0, peak: 'B' });
-  assert.deepEqual(plainOf(b.rect.notes), [U('There is no rectangular load, so F_rect = 0 N and it adds no torque.')]);
-  assert.deepEqual(plainOf(b.tri.notes), [U('There is no triangular load, so F_tri = 0 N and it adds no torque.')]);
-  assert.deepEqual(plainOf(b.comb.notes), [U('There is no load, so F_equiv = 0 N and there is nothing to replace.')]);
+  assert.deepEqual(plainOf(b.rect.notes), [U('There is no rectangular load, so F_rect = 0 N and it adds no moment.')]);
+  assert.deepEqual(plainOf(b.tri.notes), [U('There is no triangular load, so F_tri = 0 N and it adds no moment.')]);
+  assert.deepEqual(plainOf(b.comb.notes), [U('There is no load, so F_equiv = 0 N, M_net = 0 N·m and there is nothing to replace.')]);
   assert.deepEqual(plainOf(b.comb.plug), [
     U('F_rect = 0 N, F_tri = 0 N'),
     U('F_equiv = F_rect + F_tri = 0 N + 0 N = 0 N')
@@ -188,26 +194,33 @@ test('no load at all: a note in each block and no r_equiv line', () => {
 test('off the beam: the r_equiv line says where, and the unrounded note follows when the rule says so', () => {
   const left = blocksOf({ r: 100, t: -190, peak: 'B' });
   assert.ok(panelNeedsExact(derive({ r: 100, t: -190, peak: 'B' })));
-  assert.equal(detailPlain(left.comb.plug[2]),
+  assert.equal(detailPlain(left.comb.plug[3]),
     U('r_equiv = (r_rect · F_rect + r_tri · F_tri) / F_equiv = (1.00 m · 200 N + 1.33 m · (−190 N)) / 10 N = −5.33 m (off the beam, left of the wall) (worked from the unrounded locations)'));
-  assert.ok(left.comb.plug[2].endsWith(' <span class="rnd">(worked from the unrounded locations)</span>'), 'the note is a span of class rnd, the style hook');
+  assert.ok(left.comb.plug[3].endsWith(' <span class="rnd">(worked from the unrounded locations)</span>'), 'the note is a span of class rnd, the style hook');
   const beyond = blocksOf({ r: 100, t: -190, peak: 'A' });
-  assert.ok(detailPlain(beyond.comb.plug[2]).includes(U('= 7.33 m (off the beam, beyond C)')), detailPlain(beyond.comb.plug[2]));
+  assert.ok(detailPlain(beyond.comb.plug[3]).includes(U('= 7.33 m (off the beam, beyond C)')), detailPlain(beyond.comb.plug[3]));
   const on = blocksOf(DEFAULT);
-  assert.ok(!/off the beam|unrounded/.test(detailPlain(on.comb.plug[2])));
+  assert.ok(!/off the beam|unrounded/.test(detailPlain(on.comb.plug[3])));
 });
 
-test('the unrounded note appears exactly when panelNeedsExact says so, and only on the r_equiv line', () => {
-  let withNote = 0;
+test('the unrounded note: on the r_equiv line exactly when panelNeedsExact says so, on the M_net line exactly when panelMomentNeedsExact does', () => {
+  let withNote = 0, momentNote = 0;
+  const NOTE = '(worked from the unrounded locations)';
   for (const s of STATES) {
     const d = derive(s);
-    if (d.comb.F === 0 || d.rect.F === 0 || d.tri.F === 0) continue;
+    if (d.rect.F === 0 && d.tri.F === 0) continue;
     const b = blocksOf(s);
-    const has = b.comb.plug.some(l => detailPlain(l).includes('(worked from the unrounded locations)'));
+    const m = detailPlain(b.comb.plug[2]);
+    assert.ok(m.startsWith('M_net = '), m);
+    assert.equal(m.endsWith(NOTE), panelMomentNeedsExact(d, s.peak), JSON.stringify(s));
+    if (m.endsWith(NOTE)) momentNote++;
+    if (d.comb.F === 0 || d.rect.F === 0 || d.tri.F === 0) continue;
+    const has = detailPlain(b.comb.plug[3]).endsWith(NOTE);
     assert.equal(has, panelNeedsExact(d), JSON.stringify(s));
-    if (has) { withNote++; assert.ok(detailPlain(b.comb.plug.at(-1)).endsWith('(worked from the unrounded locations)')); }
+    if (has) withNote++;
+    assert.ok(!detailPlain(b.comb.plug[0]).includes(NOTE) && !detailPlain(b.comb.plug[1]).includes(NOTE));
   }
-  assert.ok(withNote > 1000, `${withNote} states carry the note`);
+  assert.ok(withNote > 1000 && momentNote > 1000, `${withNote} r_equiv and ${momentNote} M_net lines carry the note`);
 });
 
 // ---- the whole grid -------------------------------------------------------------------------------
@@ -252,7 +265,7 @@ test('over the whole grid: no digit in a set-up line, the three blocks, in order
 });
 
 test('over the whole grid: the plug values equal derive(s) to the printed precision', () => {
-  let forceChecks = 0, locationChecks = 0;
+  let forceChecks = 0, locationChecks = 0, momentChecks = 0;
   for (const s of STATES) {
     const d = derive(s);
     const b = blocksOf(s);
@@ -271,14 +284,20 @@ test('over the whole grid: the plug values equal derive(s) to the printed precis
       closeTo(lastValue(tri[3])[1], d.tri.x, 0.005, `r_tri ${at}`);
       closeTo(valueOf(comb[0], 'r_tri')[1], d.tri.x, 0.005, `r_tri (comb) ${at}`); locationChecks += 2;
     }
+    const noLoad = d.rect.F === 0 && d.tri.F === 0;
+    if (!noLoad) {
+      const p = momentParts(d.M);
+      assert.ok(comb[2].startsWith('M_net = ') && comb[2].includes(`= ${p.text}${p.dir ? ` (${p.dir})` : ''}`), `${at}: ${comb[2]}`);
+      momentChecks++;
+    }
     if (d.comb.x !== null) {
-      assert.equal(comb.length, 3, at);
-      closeTo(lastValue(comb[2])[1], d.comb.x, 0.005, `r_equiv ${at}`); locationChecks++;
+      assert.equal(comb.length, 4, at);
+      closeTo(lastValue(comb[3])[1], d.comb.x, 0.005, `r_equiv ${at}`); locationChecks++;
     } else {
-      assert.ok(comb.length === 2 && !comb.some(l => l.startsWith('r_equiv =')), `${at}: no r_equiv line when F_equiv is 0`);
+      assert.ok(comb.length === (noLoad ? 2 : 3) && !comb.some(l => l.startsWith('r_equiv =')), `${at}: no r_equiv line when F_equiv is 0`);
     }
   }
-  assert.ok(forceChecks === STATES.length * 5 && locationChecks > 40000, `${forceChecks} force and ${locationChecks} location checks`);
+  assert.ok(forceChecks === STATES.length * 5 && locationChecks > 40000 && momentChecks === STATES.length - 2, `${forceChecks} force, ${locationChecks} location and ${momentChecks} moment checks`);
 });
 
 // The printed numbers of a line, in order (a number is followed by a no-break space and its unit).
@@ -306,7 +325,7 @@ test('over the whole grid: w_A and w_B, the F_equiv operands and the r_equiv ter
     assert.ok(Math.abs(fr + ft - fe) <= 0.01, `${at}: the printed operands do not add to the printed sum: ${sum}`);
     operandChecks += 3;
     // r_equiv = formula = (x_rect · F_rect + x_tri · F_tri) / F_equiv = result: evaluate the printed terms
-    const line = plainOf(b.comb.plug)[2];
+    const line = plainOf(b.comb.plug)[3];
     if (d.comb.x === null) { assert.equal(line, undefined, at); continue; }
     const parts = line.split(' = ');
     assert.ok(parts.length === 4 && parts[0] === 'r_equiv', `${at}: ${line}`);

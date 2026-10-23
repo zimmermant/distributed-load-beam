@@ -3,12 +3,12 @@
 // A number: optional sign (U+2212 or hyphen-minus), digits with optional decimals, or '.5'. A full stop after
 // digits ends a sentence ('→ 0.'), it is not a decimal point. An exponent belongs to its number: fmt prints a
 // pasted 1e60 as '1e+60' (a long-standing quirk of Number.toFixed beyond 1e21), and the unit follows the whole token.
-// Its unit: optionally one space, then N/m, N or m as a whole word (so "4 metre" is NOT a unit).
+// Its unit: optionally one space, then N/m, N·m, N or m as a whole word (so "4 metre" is NOT a unit).
 // The space between a number and its unit must be a NO-BREAK SPACE (U+00A0), so a line break can never
 // separate them: a plain space there is its own offence (the 'plain' list), checked by every source.
 export const NUMBER = /[−-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?/g;
 export const NBSP = '\u00a0';
-export const UNIT_AFTER = /^[ \u00a0]?(?:N\/m|N|m)(?![A-Za-z0-9\/])/;
+export const UNIT_AFTER = /^[ \u00a0]?(?:N\/m|N·m|N|m)(?![A-Za-z0-9\/])/;
 
 
 // Returns the numbers in `str` that are not followed by a unit.

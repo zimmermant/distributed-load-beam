@@ -1,8 +1,8 @@
 import { BEAM_L, LOADED_L } from './physics.js';
-import { NBSP, fmt, forceWords, locWords } from './format.js';
+import { NBSP, fmt, forceWords, locWords, momentWords } from './format.js';
 import { el, clear, text, COLORS } from './svg.js';
 import { derive } from './state.js';
-import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from './layout.js';
+import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, offBeamMarker, columnOutline, columnCard } from './layout.js';
 
 // Drawing style only: every position and length comes from layout.js.
 const SCENE_TEXT = 16;            // every text is at least this many units (12 px at 800 px wide)
@@ -19,6 +19,7 @@ const SCENE_HEAD_MAX = 9;         // arrow head length cap
 const SCENE_CARD_FILL = 0.05;     // the column card's tint
 const SCENE_CARD_STROKE = 0.45;   // the column card's frame opacity
 const SCENE_CARD_HEAD = 0.12;     // the heading band's tint
+const SCENE_OFF_W = 2.4;          // shaft width of the off-the-beam arrow (thinner than a force arrow: it is not a force)
 
 // A text node with its class set (svg.js's text() takes no class option).
 export function sceneText(parent, x, y, str, opts, cls = 't') {
@@ -36,6 +37,20 @@ export function sceneArrow(parent, a, color, width) {
   const g = el('g', { class: 'g' }, parent);
   el('line', { x1: a.x, y1: a.yTail, x2: a.x, y2: yBase, stroke: color, 'stroke-width': width }, g);
   el('path', { d: `M${a.x - half} ${yBase} L${a.x} ${a.yHead} L${a.x + half} ${yBase} Z`, fill: color }, g);
+  return g;
+}
+
+// The off-the-beam marker m (layout.js offBeamMarker): a level arrow, class "g off", pointing off the beam,
+// then its two label lines in the column colour.
+export function sceneOffBeam(parent, m, color) {
+  const a = m.arrow;
+  const dir = a.xHead > a.xTail ? 1 : -1;
+  const xBase = a.xHead - dir * SCENE_HEAD_MAX;
+  const half = SCENE_OFF_W * 1.6 + 1;
+  const g = el('g', { class: 'g off' }, parent);
+  el('line', { x1: a.xTail, y1: a.y, x2: xBase, y2: a.y, stroke: color, 'stroke-width': SCENE_OFF_W }, g);
+  el('path', { d: `M${xBase} ${a.y - half} L${a.xHead} ${a.y} L${xBase} ${a.y + half} Z`, fill: color }, g);
+  m.lines.forEach((str, i) => sceneText(parent, m.text.x, m.text.y[i], str, { fill: color, anchor: m.text.anchor }));
   return g;
 }
 
@@ -79,7 +94,8 @@ function sceneTopLines(s) {
   return lines;
 }
 
-// The three text lines of equivalent-force column k: name, force, location.
+// The heading lines of equivalent-force column k: name, force, location; the Combined card adds the net moment about A
+// (a label, then the value), which a couple has too.
 function sceneColumnLines(name, part, d) {
   const F = part.F;
   let third;
@@ -89,7 +105,9 @@ function sceneColumnLines(name, part, d) {
   } else {
     third = locWords(part.x);
   }
-  return [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
+  const lines = [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
+  if (name === 'Combined') lines.push('net moment about A:', momentWords(d.M));
+  return lines;
 }
 
 function sceneTop(svg, s) {
@@ -129,7 +147,7 @@ function sceneTop(svg, s) {
   lines.forEach(([str, color, bold], i) => {
     sceneText(svg, TOP.textX, TOP.beamY + dy[i], str, { fill: color, weight: bold ? 700 : 400 });
   });
-  sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ down, − up)', {}).setAttribute('opacity', 0.7);
+  sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ up, − down)', {}).setAttribute('opacity', 0.7);
 }
 
 // A dotted, unfilled outline of one layout polygon (its points as given, closed with Z).
@@ -169,10 +187,13 @@ function sceneColumns(svg, d, s) {
     for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
     const a = forceArrow(k, part.F, part.x);
     if (a) sceneArrow(svg, a, color, 3.4);
+    const m = offBeamMarker(k, part.F, part.x);
+    if (m) sceneOffBeam(svg, m, color);
     const lines = sceneColumnLines(name, part, d);
     lines.forEach((str, i) => {
       if (str === '') return;
-      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
+      const strong = i < 2 || i === 4;                // name, force and the moment's value; the location and the moment's label are plain
+      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: strong ? color : COLORS.ink, weight: strong ? 700 : 400 });
     });
   });
 }

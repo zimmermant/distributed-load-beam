@@ -1,8 +1,9 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { VB, BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from '../src/layout.js';
-import { BEAM_L, LOADED_L, loadAt, equivalents } from '../src/physics.js';
+import { VB, BEAM_H, TOP, COLS, OFF, topX, colX, loadShapes, forceArrow, offBeamMarker, columnOutline, columnCard } from '../src/layout.js';
+import { BEAM_L, LOADED_L, loadAt, equivalents, snapW } from '../src/physics.js';
+import { offSide } from '../src/format.js';
 
 const EPS = 1e-9;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < EPS, `${msg || ''} ${a} vs ${b}`);
@@ -49,8 +50,8 @@ test('forceArrow is null for F 0, x null/undefined, x below 0 and x above BEAM_L
 test('a force at or near the wall has its head on the correct beam face', () => {
   for (const x of [0, 0.05, 0.1199]) {
     for (const k of [0, 1, 2]) {
-      const down = forceArrow(k, 100, x);
-      const up = forceArrow(k, -100, x);
+      const down = forceArrow(k, -100, x);
+      const up = forceArrow(k, 100, x);
       assert.equal(down.yHead, COLS.beamY, `down k=${k} x=${x}`);
       assert.ok(down.yTail < down.yHead);
       assert.equal(up.yHead, COLS.beamY + BEAM_H, `up k=${k} x=${x}`);
@@ -59,24 +60,24 @@ test('a force at or near the wall has its head on the correct beam face', () => 
   }
 });
 
-test('r=100, t=-150, peak B: the combined force acts at x = 0 and its arrow is drawn there, head on the beam top', () => {
-  for (const s of [{ r: 100, t: -150, peak: 'B' }, { r: -100, t: 150, peak: 'B' }]) {
+test('r=-100, t=150, peak B: the combined force acts at x = 0 and its arrow is drawn there, head on the beam top', () => {
+  for (const s of [{ r: -100, t: 150, peak: 'B' }, { r: 100, t: -150, peak: 'B' }]) {
     const e = equivalents(s);
     assert.equal(e.comb.x + 0, 0);                  // + 0: the second state's x is -0, which is still the wall
     assert.notEqual(e.comb.F, 0);
     const a = forceArrow(2, e.comb.F, e.comb.x);
     assert.notEqual(a, null);
     assert.equal(a.x, colX(2, 0));
-    assert.equal(a.yHead, e.comb.F > 0 ? COLS.beamY : COLS.beamY + BEAM_H);
+    assert.equal(a.yHead, e.comb.F < 0 ? COLS.beamY : COLS.beamY + BEAM_H);
   }
-  const a = forceArrow(2, equivalents({ r: 100, t: -150, peak: 'B' }).comb.F, 0);
+  const a = forceArrow(2, equivalents({ r: -100, t: 150, peak: 'B' }).comb.F, 0);
   assert.equal(a.yHead, COLS.beamY);                // 50 N down: head on the top face
 });
 
 test('a down force ends on the beam top and an up force on the beam bottom', () => {
   for (let k = 0; k < 3; k++) {
-    const down = forceArrow(k, 100, 1);
-    const up = forceArrow(k, -100, 1);
+    const down = forceArrow(k, -100, 1);
+    const up = forceArrow(k, 100, 1);
     assert.equal(down.yHead, COLS.beamY);
     assert.ok(down.yTail < down.yHead);
     assert.equal(up.yHead, COLS.beamY + BEAM_H);
@@ -118,7 +119,7 @@ test('loadShapes: every shape and arrow stays inside the figure\'s bands for eve
 });
 
 test('loadShapes: 8 arrows, none at x=0 or x=2, none where |w|·unit < 8', () => {
-  const full = loadShapes({ r: 100, t: 0, peak: 'B' });
+  const full = loadShapes({ r: -100, t: 0, peak: 'B' });   // 100 N/m down
   assert.equal(full.arrows.length, 8);
   for (let i = 0; i < 8; i++) {
     const x = (i + 0.5) * LOADED_L / 8;
@@ -127,8 +128,8 @@ test('loadShapes: 8 arrows, none at x=0 or x=2, none where |w|·unit < 8', () =>
     close(full.arrows[i].yHead - full.arrows[i].yTail, 100 * TOP.unit);
     assert.equal(full.arrows[i].yHead, TOP.beamY);
   }
-  // r = -100, t = 100 peak B: w goes -100 -> 0, so the small-|w| arrows near B are omitted
-  const s = { r: -100, t: 100, peak: 'B' };
+  // r = 100, t = -100 peak B: w goes 100 -> 0, so the small-|w| arrows near B are omitted
+  const s = { r: 100, t: -100, peak: 'B' };
   const L = loadShapes(s);
   const expected = [];
   for (let i = 0; i < 8; i++) {
@@ -141,7 +142,7 @@ test('loadShapes: 8 arrows, none at x=0 or x=2, none where |w|·unit < 8', () =>
   L.arrows.forEach((a, i) => {
     assert.equal(a.x, expected[i].x);
     close(Math.abs(a.yTail - a.yHead), Math.abs(expected[i].w) * TOP.unit);
-    assert.equal(a.yHead, expected[i].w > 0 ? TOP.beamY : TOP.beamY + BEAM_H);
+    assert.equal(a.yHead, expected[i].w < 0 ? TOP.beamY : TOP.beamY + BEAM_H);
   });
   // everything below the threshold: r = 0, t = 0 has no arrows at all
   assert.equal(loadShapes({ r: 0, t: 0, peak: 'A' }).arrows.length, 0);
@@ -152,36 +153,36 @@ test('loadShapes: 8 arrows, none at x=0 or x=2, none where |w|·unit < 8', () =>
 test('loadShapes: same-sign r and t stack (triangle base = rectangle outer edge); opposite signs sit on opposite sides', () => {
   const x0 = topX(0), x2 = topX(LOADED_L);
   // both down: rect above the beam, triangle stacked on its top
-  let L = loadShapes({ r: 100, t: 100, peak: 'B' });
+  let L = loadShapes({ r: -100, t: -100, peak: 'B' });
   assert.deepEqual(L.rect, { x: x0, y: TOP.beamY - 100 * TOP.unit, w: x2 - x0, h: 100 * TOP.unit });
   const base = L.rect.y;
   assert.equal(L.tri.pts.filter(p => p[1] === base).length, 2);
   assert.deepEqual(L.tri.pts.find(p => p[1] !== base), [x2, base - 100 * TOP.unit]);
   // both up: rect below the beam, triangle stacked below it
-  L = loadShapes({ r: -100, t: -200, peak: 'A' });
+  L = loadShapes({ r: 100, t: 200, peak: 'A' });
   assert.deepEqual(L.rect, { x: x0, y: TOP.beamY + BEAM_H, w: x2 - x0, h: 100 * TOP.unit });
   const base2 = L.rect.y + L.rect.h;
   assert.equal(L.tri.pts.filter(p => p[1] === base2).length, 2);
   assert.deepEqual(L.tri.pts.find(p => p[1] !== base2), [x0, base2 + 200 * TOP.unit]);
-  // opposite: rect up (r<0, below), triangle down (t>0, above), hanging from the beam top
-  L = loadShapes({ r: -100, t: 100, peak: 'B' });
+  // opposite: rect up (r>0, below), triangle down (t<0, above), resting on the beam top
+  L = loadShapes({ r: 100, t: -100, peak: 'B' });
   assert.equal(L.rect.y, TOP.beamY + BEAM_H);
   assert.equal(L.tri.pts.filter(p => p[1] === TOP.beamY).length, 2);
   assert.deepEqual(L.tri.pts.find(p => p[1] !== TOP.beamY), [x2, TOP.beamY - 100 * TOP.unit]);
-  // opposite the other way: r>0 above, t<0 hangs from the beam bottom
-  L = loadShapes({ r: 100, t: -100, peak: 'A' });
+  // opposite the other way: r<0 above, t>0 hangs from the beam bottom
+  L = loadShapes({ r: -100, t: 100, peak: 'A' });
   assert.equal(L.rect.y, TOP.beamY - 100 * TOP.unit);
   const bot = TOP.beamY + BEAM_H;
   assert.equal(L.tri.pts.filter(p => p[1] === bot).length, 2);
   assert.deepEqual(L.tri.pts.find(p => p[1] !== bot), [x0, bot + 100 * TOP.unit]);
   // r = 0: triangle rests on the beam face of its own side
-  L = loadShapes({ r: 0, t: 100, peak: 'B' });
+  L = loadShapes({ r: 0, t: -100, peak: 'B' });
   assert.equal(L.rect, null);
   assert.equal(L.tri.pts.filter(p => p[1] === TOP.beamY).length, 2);
-  L = loadShapes({ r: 0, t: -100, peak: 'B' });
+  L = loadShapes({ r: 0, t: 100, peak: 'B' });
   assert.equal(L.tri.pts.filter(p => p[1] === bot).length, 2);
   // t = 0: no triangle
-  assert.equal(loadShapes({ r: 100, t: 0, peak: 'B' }).tri, null);
+  assert.equal(loadShapes({ r: -100, t: 0, peak: 'B' }).tri, null);
 });
 
 test('peak A and peak B mirror each other in x', () => {
@@ -210,13 +211,13 @@ test('everything fits the viewBox: TOP.dimTextY + 4 < COLS.textY[0] − 12 and C
   assert.ok(TOP.beamY + BEAM_H + TOP.band < TOP.dimY);
 });
 
-test('the column text lines clear the highest possible arrow: COLS.textY[2] + 6 ≤ COLS.beamY − COLS.band', () => {
-  assert.ok(COLS.textY[2] + 6 <= COLS.beamY - COLS.band);
+test('the column text lines clear the highest possible arrow: the last text line + 6 ≤ COLS.beamY − COLS.band', () => {
+  assert.ok(COLS.textY[COLS.textY.length - 1] + 6 <= COLS.beamY - COLS.band);
   assert.ok(COLS.fs * 600 <= COLS.band + EPS);
 });
 
 test('loadShapes: every arrow follows the sign of w at its own position, not of r or t alone', () => {
-  const s = { r: 100, t: -200, peak: 'B' };           // w runs +100 at A to -100 at B
+  const s = { r: -100, t: 200, peak: 'B' };           // w runs -100 (down) at A to +100 (up) at B
   const L = loadShapes(s);
   assert.ok(L.arrows.length >= 4);
   const downs = L.arrows.filter(a => a.yHead === TOP.beamY);
@@ -225,8 +226,8 @@ test('loadShapes: every arrow follows the sign of w at its own position, not of 
   assert.ok(downs.length > 0 && ups.length > 0, 'both directions appear');
   for (const a of L.arrows) {
     const w = loadAt(s, (a.x - topX(0)) / TOP.px);
-    assert.equal(a.yHead, w > 0 ? TOP.beamY : TOP.beamY + BEAM_H);
-    if (w > 0) assert.ok(a.yTail < a.yHead); else assert.ok(a.yTail > a.yHead);
+    assert.equal(a.yHead, w < 0 ? TOP.beamY : TOP.beamY + BEAM_H);
+    if (w < 0) assert.ok(a.yTail < a.yHead); else assert.ok(a.yTail > a.yHead);
   }
 });
 
@@ -241,66 +242,66 @@ const BOTF = COLS.beamY + BEAM_H;        // its bottom face
 const pts = (polys) => polys.map(poly => poly.map(p => p.map(v => Math.round(v * 1e6) / 1e6)));
 const U = TOP.unit;
 
-test('columnOutline rectangle (column 0): r=100 sits above the beam, r=-100 hangs below, r=0 is empty', () => {
+test('columnOutline rectangle (column 0): r=-100 (down) sits above the beam, r=100 (up) hangs below, r=0 is empty', () => {
   const x0 = colX(0, 0), x2 = colX(0, LOADED_L);
-  assert.deepEqual(pts(columnOutline(0, { r: 100, t: 0, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 100 * U], [x2, TOPF - 100 * U], [x2, TOPF]]]);
-  assert.deepEqual(pts(columnOutline(0, { r: -100, t: 0, peak: 'B' })), [[[x0, BOTF], [x0, BOTF + 100 * U], [x2, BOTF + 100 * U], [x2, BOTF]]]);
+  assert.deepEqual(pts(columnOutline(0, { r: -100, t: 0, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 100 * U], [x2, TOPF - 100 * U], [x2, TOPF]]]);
+  assert.deepEqual(pts(columnOutline(0, { r: 100, t: 0, peak: 'B' })), [[[x0, BOTF], [x0, BOTF + 100 * U], [x2, BOTF + 100 * U], [x2, BOTF]]]);
   assert.equal(TOPF - 100 * U, TOPF - 20);          // the brief's height of 20 units for 100 N/m
-  assert.deepEqual(columnOutline(0, { r: 0, t: 150, peak: 'A' }), []);
+  assert.deepEqual(columnOutline(0, { r: 0, t: -150, peak: 'A' }), []);
   // the triangle never leaks into the rectangle's column
-  assert.deepEqual(columnOutline(0, { r: 100, t: 150, peak: 'A' }), columnOutline(0, { r: 100, t: -50, peak: 'B' }));
+  assert.deepEqual(columnOutline(0, { r: -100, t: -150, peak: 'A' }), columnOutline(0, { r: -100, t: 50, peak: 'B' }));
 });
 
-test('columnOutline triangle (column 1): base on the face, apex at the peak end, t<0 hangs below, t=0 is empty', () => {
+test('columnOutline triangle (column 1): base on the face, apex at the peak end, t>0 (up) hangs below, t=0 is empty', () => {
   const x0 = colX(1, 0), x2 = colX(1, LOADED_L);
-  assert.deepEqual(pts(columnOutline(1, { r: 100, t: 100, peak: 'B' })), [[[x0, TOPF], [x2, TOPF - 20], [x2, TOPF]]]);
-  assert.deepEqual(pts(columnOutline(1, { r: 100, t: 100, peak: 'A' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF]]]);
-  assert.deepEqual(pts(columnOutline(1, { r: 0, t: -100, peak: 'B' })), [[[x0, BOTF], [x2, BOTF + 20], [x2, BOTF]]]);
-  assert.deepEqual(pts(columnOutline(1, { r: 0, t: -100, peak: 'A' })), [[[x0, BOTF], [x0, BOTF + 20], [x2, BOTF]]]);
-  assert.deepEqual(columnOutline(1, { r: 100, t: 0, peak: 'B' }), []);
-  assert.deepEqual(columnOutline(1, { r: -100, t: 0, peak: 'A' }), []);
+  assert.deepEqual(pts(columnOutline(1, { r: -100, t: -100, peak: 'B' })), [[[x0, TOPF], [x2, TOPF - 20], [x2, TOPF]]]);
+  assert.deepEqual(pts(columnOutline(1, { r: -100, t: -100, peak: 'A' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF]]]);
+  assert.deepEqual(pts(columnOutline(1, { r: 0, t: 100, peak: 'B' })), [[[x0, BOTF], [x2, BOTF + 20], [x2, BOTF]]]);
+  assert.deepEqual(pts(columnOutline(1, { r: 0, t: 100, peak: 'A' })), [[[x0, BOTF], [x0, BOTF + 20], [x2, BOTF]]]);
+  assert.deepEqual(columnOutline(1, { r: -100, t: 0, peak: 'B' }), []);
+  assert.deepEqual(columnOutline(1, { r: 100, t: 0, peak: 'A' }), []);
   // the rectangle never leaks into the triangle's column
-  assert.deepEqual(columnOutline(1, { r: 100, t: 100, peak: 'B' }), columnOutline(1, { r: -200, t: 100, peak: 'B' }));
+  assert.deepEqual(columnOutline(1, { r: -100, t: -100, peak: 'B' }), columnOutline(1, { r: 200, t: -100, peak: 'B' }));
 });
 
 test('columnOutline combined (column 2): trapezoid for the net load, two triangles at a sign change, one triangle when an end is 0', () => {
   const x0 = colX(2, 0), x2 = colX(2, LOADED_L);
-  // r=100, t=100, peak B: w = 100 at A, 200 at B -> heights 20 and 40
-  assert.deepEqual(pts(columnOutline(2, { r: 100, t: 100, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF - 40], [x2, TOPF]]]);
+  // r=-100, t=-100, peak B: w = -100 at A, -200 at B (down) -> heights 20 and 40 above the beam
+  assert.deepEqual(pts(columnOutline(2, { r: -100, t: -100, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF - 40], [x2, TOPF]]]);
   // peak A mirrors it
-  assert.deepEqual(pts(columnOutline(2, { r: 100, t: 100, peak: 'A' })), [[[x0, TOPF], [x0, TOPF - 40], [x2, TOPF - 20], [x2, TOPF]]]);
-  // r=100, t=-200, peak B: +100 at A, -100 at B, zero at xc = 1 m
+  assert.deepEqual(pts(columnOutline(2, { r: -100, t: -100, peak: 'A' })), [[[x0, TOPF], [x0, TOPF - 40], [x2, TOPF - 20], [x2, TOPF]]]);
+  // r=-100, t=200, peak B: -100 at A, +100 at B, zero at xc = 1 m
   const xc = colX(2, 1);
-  const two = columnOutline(2, { r: 100, t: -200, peak: 'B' });
+  const two = columnOutline(2, { r: -100, t: 200, peak: 'B' });
   assert.equal(two.length, 2);
   assert.deepEqual(pts(two), [[[x0, TOPF], [x0, TOPF - 20], [xc, TOPF]], [[xc, BOTF], [x2, BOTF + 20], [x2, BOTF]]]);
-  // w(0) = 0: one triangle only (r=0, t=100, peak B), same shape as the column-1 outline of that load
-  const one = columnOutline(2, { r: 0, t: 100, peak: 'B' });
+  // w(0) = 0: one triangle only (r=0, t=-100, peak B), same shape as the column-1 outline of that load
+  const one = columnOutline(2, { r: 0, t: -100, peak: 'B' });
   assert.equal(one.length, 1);
   assert.deepEqual(pts(one), [[[x0, TOPF], [x2, TOPF - 20], [x2, TOPF]]]);
-  // w(L) = 0 (r=100, t=-100, peak B): w goes 100 -> 0, one triangle apex at A
-  assert.deepEqual(pts(columnOutline(2, { r: 100, t: -100, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF]]]);
-  // all-negative net: hangs below
-  assert.deepEqual(pts(columnOutline(2, { r: -100, t: -100, peak: 'B' })), [[[x0, BOTF], [x0, BOTF + 20], [x2, BOTF + 40], [x2, BOTF]]]);
+  // w(L) = 0 (r=-100, t=100, peak B): w goes -100 -> 0, one triangle apex at A
+  assert.deepEqual(pts(columnOutline(2, { r: -100, t: 100, peak: 'B' })), [[[x0, TOPF], [x0, TOPF - 20], [x2, TOPF]]]);
+  // all-positive (upward) net: hangs below
+  assert.deepEqual(pts(columnOutline(2, { r: 100, t: 100, peak: 'B' })), [[[x0, BOTF], [x0, BOTF + 20], [x2, BOTF + 40], [x2, BOTF]]]);
   // nothing: no load, and a net load that is identically zero
   assert.deepEqual(columnOutline(2, { r: 0, t: 0, peak: 'A' }), []);
   assert.deepEqual(columnOutline(2, { r: 0, t: 0, peak: 'B' }), []);
 });
 
-test('columnOutline crossing: the zero crossing sits at xc = L*w(0)/(w(0)-w(L)), from the end values (r=100, t=-300 crosses at 2/3 m)', () => {
-  const two = columnOutline(2, { r: 100, t: -300, peak: 'B' });       // w: +100 at A, -200 at B
+test('columnOutline crossing: the zero crossing sits at xc = L*w(0)/(w(0)-w(L)), from the end values (r=-100, t=300 crosses at 2/3 m)', () => {
+  const two = columnOutline(2, { r: -100, t: 300, peak: 'B' });       // w: -100 at A, +200 at B
   assert.equal(two.length, 2);
   const xc = colX(2, LOADED_L * 100 / 300);
   close(two[0][2][0], xc, 'first piece ends at the crossing');
   close(two[1][0][0], xc, 'second piece starts at the crossing');
   close(two[0][1][1], TOPF - 100 * U);
   close(two[1][1][1], BOTF + 200 * U);
-  // peak A: w(0) = r + t = -100 at A, w(L) = r = 100 at B -> crossing at L/2
-  const a = columnOutline(2, { r: 100, t: -200, peak: 'A' });
+  // peak A: w(0) = r + t = 100 at A, w(L) = r = -100 at B -> crossing at L/2
+  const a = columnOutline(2, { r: -100, t: 200, peak: 'A' });
   assert.equal(a.length, 2);
   close(a[0][2][0], colX(2, 1));
-  assert.ok(a[0].every(p => p[1] >= BOTF - 1e-9), 'the negative piece (near A) hangs below');
-  assert.ok(a[1].every(p => p[1] <= TOPF + 1e-9), 'the positive piece (near B) sits above');
+  assert.ok(a[0].every(p => p[1] >= BOTF - 1e-9), 'the positive (upward) piece near A hangs below');
+  assert.ok(a[1].every(p => p[1] <= TOPF + 1e-9), 'the negative (downward) piece near B sits above');
 });
 
 test('columnOutline over the slider grid: inside the column band and the AB span, never degenerate, on the right face', () => {
@@ -331,12 +332,12 @@ test('columnOutline over the slider grid: inside the column band and the AB span
         const below = poly.every(p => p[1] >= BOTF - eps);
         assert.ok(above !== below, `entirely above the top face or below the bottom face, k=${k} ${JSON.stringify(s)}`);
       }
-      if (k === 0 && out.length) assert.equal(out[0].every(p => p[1] <= TOPF + eps), r > 0);
-      if (k === 1 && out.length) assert.equal(out[0].every(p => p[1] <= TOPF + eps), t > 0);
-      if (k === 2 && out.length === 1) assert.equal(out[0].every(p => p[1] <= TOPF + eps), w0 + wL > 0);
+      if (k === 0 && out.length) assert.equal(out[0].every(p => p[1] <= TOPF + eps), r < 0);
+      if (k === 1 && out.length) assert.equal(out[0].every(p => p[1] <= TOPF + eps), t < 0);
+      if (k === 2 && out.length === 1) assert.equal(out[0].every(p => p[1] <= TOPF + eps), w0 + wL < 0);
       if (k === 2 && out.length === 2) {
-        assert.equal(out[0].every(p => p[1] <= TOPF + eps), w0 > 0);
-        assert.equal(out[1].every(p => p[1] <= TOPF + eps), wL > 0);
+        assert.equal(out[0].every(p => p[1] <= TOPF + eps), w0 < 0);
+        assert.equal(out[1].every(p => p[1] <= TOPF + eps), wL < 0);
       }
     }
   }
@@ -363,13 +364,19 @@ test('the browser harness hard-codes the same card geometry as layout.js (the co
 // ---- the card of each equivalent-force column --------------------------------------------------
 const CARD_TEXT_MAX = 272;   // the widest column text (verified), in units
 
-test('columnCard(k): the exact numbers, one card per column, x = COLS.x[k] - 4, width 300, y 240 to 558, rx 8, heading 74 tall', () => {
+test('columnCard(k): the exact numbers, one card per column, x = COLS.x[k] - 4, width 300, y 240 to 546, rx 8, heading 110 tall', () => {
   assert.equal(COLS.textPad, 8);
-  assert.deepEqual(columnCard(0), { x: 16, y: 240, w: 300, h: 318, rx: 8, headH: 74 });
-  assert.deepEqual(columnCard(1), { x: 326, y: 240, w: 300, h: 318, rx: 8, headH: 74 });
-  assert.deepEqual(columnCard(2), { x: 636, y: 240, w: 300, h: 318, rx: 8, headH: 74 });
+  assert.deepEqual(columnCard(0), { x: 16, y: 240, w: 300, h: 306, rx: 8, headH: 110 });
+  assert.deepEqual(columnCard(1), { x: 326, y: 240, w: 300, h: 306, rx: 8, headH: 110 });
+  assert.deepEqual(columnCard(2), { x: 636, y: 240, w: 300, h: 306, rx: 8, headH: 110 });
   for (let k = 0; k < 3; k++) assert.equal(columnCard(k).x, COLS.x[k] - 4);
-  assert.deepEqual(COLS.card, { dx: -4, w: 300, y: 240, bottom: 558, rx: 8, headH: 74, stroke: 1.5 });
+  assert.deepEqual(COLS.card, { dx: -4, w: 300, y: 240, bottom: 546, rx: 8, headH: 110, stroke: 1.5 });
+  // five heading lines 20 apart (the Combined card's net moment takes lines 4 and 5); the force scale 0.14 keeps the figure
+  // short enough for the page to fit 800x750 and 1280x720 (Todd's call, 2026-10-23), and its band of 84 still holds the
+  // tallest load outline (400 N/m at 0.2 = 80 units)
+  assert.deepEqual(COLS.textY, [262, 282, 302, 322, 342]);
+  assert.deepEqual([COLS.beamY, COLS.band, COLS.fs, VB.h], [436, 84, 0.14, 548]);
+  assert.ok(400 * TOP.unit <= COLS.band);
 });
 
 test('the cards do not overlap (a 10 unit gap between neighbours) and lie inside the viewBox, stroke included', () => {
@@ -384,7 +391,7 @@ test('the cards do not overlap (a 10 unit gap between neighbours) and lie inside
   assert.equal(c[0].y + c[0].h, COLS.card.bottom);
 });
 
-test('the heading band starts at the card top, ends above the arrow band, and holds the three text lines with the text pad', () => {
+test('the heading band starts at the card top, ends above the arrow band, and holds the five text lines with the text pad', () => {
   for (let k = 0; k < 3; k++) {
     const c = columnCard(k);
     assert.equal(c.y, COLS.card.y);
@@ -392,7 +399,7 @@ test('the heading band starts at the card top, ends above the arrow band, and ho
     assert.ok(c.headH < c.h && c.rx * 2 <= c.headH, 'the rounded top corners fit in the band');
     // the three baselines, a 16-unit font (ascent about 16 above, a descender about 4 below) and the halo
     assert.ok(COLS.textY[0] - 16 >= c.y, 'the first line starts below the card top');
-    assert.ok(COLS.textY[2] + 4 + 2 <= c.y + c.headH, 'the last line (descender and halo) ends inside the band');
+    assert.ok(COLS.textY[COLS.textY.length - 1] + 4 + 2 <= c.y + c.headH, 'the last line (descender and halo) ends inside the band');
     // text pad plus the widest text fits the card's inner width
     const left = COLS.x[k] + COLS.textPad;
     assert.ok(left >= c.x + COLS.card.stroke);
@@ -444,4 +451,87 @@ test('over the slider grid every outline point and every force arrow (head width
   assert.equal(states, 2 * 81 * 81 * 3);
   assert.ok(points > 60000, `a non-vacuous count of outline points (${points})`);
   assert.ok(arrows > 20000, `a non-vacuous count of arrows (${arrows})`);
+});
+
+// ---- the off-the-beam marker -------------------------------------------------------------------
+test('offBeamMarker: null on the beam, for a zero force and for a missing location', () => {
+  assert.equal(offBeamMarker(2, 100, 1), null);
+  assert.equal(offBeamMarker(2, 100, 0), null);
+  assert.equal(offBeamMarker(2, 100, BEAM_L), null);
+  assert.equal(offBeamMarker(2, 100, -0.0049), null, 'prints 0.00: on the beam');
+  assert.equal(offBeamMarker(2, 0, -5), null);
+  assert.equal(offBeamMarker(2, 100, null), null);
+  assert.equal(offBeamMarker(2, 100, undefined), null);
+});
+
+test('offBeamMarker: left of A the arrow points left at the card\'s left side, beyond C it points right at the right side', () => {
+  for (let k = 0; k < 3; k++) {
+    const c = columnCard(k);
+    const left = offBeamMarker(k, 10, -16 / 3);
+    assert.equal(left.side, 'left');
+    assert.deepEqual(left.lines, ['off the beam', 'to the left']);
+    assert.equal(left.arrow.xHead, COLS.x[k] + COLS.textPad, 'head lines up with the heading text');
+    assert.equal(left.arrow.xTail, left.arrow.xHead + OFF.len, 'points left');
+    assert.equal(left.text.x, left.arrow.xHead);
+    assert.equal(left.text.anchor, 'start');
+    const right = offBeamMarker(k, 10, 22 / 3);
+    assert.equal(right.side, 'right');
+    assert.deepEqual(right.lines, ['off the beam', 'to the right']);
+    assert.equal(right.arrow.xHead, c.x + c.w - (COLS.x[k] + COLS.textPad - c.x), 'mirrors the left inset');
+    assert.equal(right.arrow.xTail, right.arrow.xHead - OFF.len, 'points right');
+    assert.equal(right.text.x, right.arrow.xHead);
+    assert.equal(right.text.anchor, 'end');
+    // past the beam ends: the tip is left of the wall's outer face (it passes above or below the wall), right of circle C
+    assert.ok(left.arrow.xHead < colX(k, 0) - 14);
+    assert.ok(right.arrow.xHead > colX(k, BEAM_L) + BEAM_H / 2);
+  }
+});
+
+test('offBeamMarker: on the force\'s side, above the beam for a down force and below for an up force, label beyond the arrow', () => {
+  const down = offBeamMarker(2, -10, -16 / 3);   // 10 N down (+ up)
+  assert.equal(down.arrow.y, COLS.beamY - OFF.gap);
+  assert.ok(down.text.y[0] < down.text.y[1] && down.text.y[1] < down.arrow.y, 'lines read top to bottom, above the arrow');
+  const up = offBeamMarker(2, 10, -16 / 3);
+  assert.equal(up.arrow.y, COLS.beamY + BEAM_H + OFF.gap);
+  assert.ok(up.arrow.y < up.text.y[0] && up.text.y[0] < up.text.y[1], 'lines read top to bottom, below the arrow');
+  assert.equal(down.text.y[1] - down.text.y[0], OFF.lineGap);
+  assert.equal(up.text.y[1] - up.text.y[0], OFF.lineGap);
+});
+
+test('offBeamMarker over every off-beam slider state: inside the card, below the heading, clear of the beam, wall and outline', () => {
+  const vals = [];
+  for (let v = -200; v <= 200; v += 5) if (snapW(v) === v) vals.push(v);
+  // the text box as Chromium measures a 16-unit label with its halo (15.6 above the baseline, 3.2 below), rounded up;
+  // a generous width per character; the arrow head's half-height
+  const ASC = 16, DESC = 4, CHAR = 0.6 * 16, HEAD = 2.4 * 1.6 + 1;
+  const wallTop = COLS.beamY - 18, wallBot = COLS.beamY + BEAM_H + 18;
+  let n = 0;
+  for (const peak of ['A', 'B']) for (const r of vals) for (const t of vals) {
+    const s = { r, t, peak };
+    const e = equivalents(s);
+    const m = offBeamMarker(2, e.comb.F, e.comb.x);
+    assert.equal(m === null, offSide(e.comb.x) === null || e.comb.F === 0, JSON.stringify(s));
+    if (!m) continue;
+    n++;
+    const c = columnCard(2);
+    const boxes = m.lines.map((str, i) => {
+      const w = str.length * CHAR;
+      const x0 = m.text.anchor === 'start' ? m.text.x : m.text.x - w;
+      return { x0, x1: x0 + w, y0: m.text.y[i] - ASC, y1: m.text.y[i] + DESC };
+    });
+    const xs = [m.arrow.xHead, m.arrow.xTail].sort((a, b) => a - b);
+    boxes.push({ x0: xs[0], x1: xs[1], y0: m.arrow.y - HEAD, y1: m.arrow.y + HEAD });
+    let top = Infinity, bot = -Infinity;
+    for (const poly of columnOutline(2, s)) for (const [, y] of poly) { top = Math.min(top, y); bot = Math.max(bot, y); }
+    for (const b of boxes) {
+      const tag = `${JSON.stringify(s)} ${JSON.stringify(b)}`;
+      assert.ok(b.x0 >= c.x && b.x1 <= c.x + c.w && b.y0 >= c.y + c.headH && b.y1 <= c.y + c.h, `inside the card below the heading: ${tag}`);
+      assert.ok(b.y1 < Math.min(top, wallTop) || b.y0 > Math.max(bot, wallBot), `clear of the beam, wall and outline: ${tag}`);
+    }
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      assert.ok(a.y1 <= b.y0 || b.y1 <= a.y0, `marker pieces do not overlap: ${JSON.stringify(s)}`);
+    }
+  }
+  assert.equal(n, 614, 'every off-beam state of the slider grid was checked');
 });

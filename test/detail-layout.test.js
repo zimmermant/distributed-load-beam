@@ -10,7 +10,7 @@ const EPS = 1e-9;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < EPS, `${msg || ''} ${a} vs ${b}`);
 const MID = DETAIL.beamY + BEAM_H / 2;
 const XB = DETAIL.x0 + LOADED_L * DETAIL.px;
-const DEFAULT = { r: 100, t: 100, peak: 'B' };
+const DEFAULT = { r: -100, t: -100, peak: 'B' };   // both loads 100 N/m down (+ up)
 
 // the slider grid used by the property tests: r, t from -200 to 200 step 5, both peaks
 const GRID = [];
@@ -45,7 +45,7 @@ test('detailX maps metres from A to viewBox x', () => {
 });
 
 test('detailHeights is loadAt at A and at B, and never -0', () => {
-  assert.deepEqual(detailHeights(DEFAULT), { wA: 100, wB: 200 });
+  assert.deepEqual(detailHeights(DEFAULT), { wA: -100, wB: -200 });
   assert.deepEqual(detailHeights({ r: 100, t: 100, peak: 'A' }), { wA: 200, wB: 100 });
   assert.deepEqual(detailHeights({ r: 50, t: 0, peak: 'A' }), { wA: 50, wB: 50 });
   let n = 0;
@@ -65,17 +65,17 @@ test('detailHeights is loadAt at A and at B, and never -0', () => {
   assert.equal(Object.is(detailHeights({ r: -0, t: -100, peak: 'B' }).wA, -0), false);
 });
 
-test('detailEdgeY: up for a positive height, below the beam for a negative one, top face at 0', () => {
-  close(detailEdgeY(100), 120);
-  close(detailEdgeY(200), 90);
-  close(detailEdgeY(-100), 204);
-  close(detailEdgeY(-200), 234);
+test('detailEdgeY: up for a negative (downward) height, below the beam for a positive (upward) one, top face at 0', () => {
+  close(detailEdgeY(-100), 120);
+  close(detailEdgeY(-200), 90);
+  close(detailEdgeY(100), 204);
+  close(detailEdgeY(200), 234);
   assert.equal(detailEdgeY(0), DETAIL.beamY);
   assert.equal(detailEdgeY(-0), DETAIL.beamY);
 });
 
-test('default state: heights 100 and 200, edges 120 and 90, labels on the edges, anchored left and right', () => {
-  assert.deepEqual(detailHeights(DEFAULT), { wA: 100, wB: 200 });
+test('default state: heights −100 and −200, edges 120 and 90, labels on the edges, anchored left and right', () => {
+  assert.deepEqual(detailHeights(DEFAULT), { wA: -100, wB: -200 });
   const { a, b } = detailLabels(DEFAULT);
   close(a.edge.y, 120); close(b.edge.y, 90);
   close(a.y, 120); close(b.y, 90);
@@ -85,8 +85,8 @@ test('default state: heights 100 and 200, edges 120 and 90, labels on the edges,
   assert.equal(b.anchor, 'start');
   assert.equal(a.name, 'w'); assert.equal(a.sub, 'A');
   assert.equal(b.name, 'w'); assert.equal(b.sub, 'B');
-  assert.equal(a.value, `100${NBSP}N/m`);
-  assert.equal(b.value, `200${NBSP}N/m`);
+  assert.equal(a.value, `−100${NBSP}N/m`);
+  assert.equal(b.value, `−200${NBSP}N/m`);
   assert.deepEqual(a.edge, { x: 250, y: a.edge.y });
   assert.equal(b.edge.x, 510);
   // leaders: a runs from just right of its text to the corner; b from the corner to just left of its text
@@ -97,21 +97,21 @@ test('default state: heights 100 and 200, edges 120 and 90, labels on the edges,
 });
 
 test('a label whose edge is near the beam is held at mid -/+ labelClear; its leader then slopes', () => {
-  // r = 50, peak A, t = 0: both heights 50, edge y 135, |135 - 162| < 40 -> label at 122
-  const { a, b } = detailLabels({ r: 50, t: 0, peak: 'A' });
+  // r = -50, peak A, t = 0: both heights -50 (down), edge y 135, |135 - 162| < 40 -> label at 122
+  const { a, b } = detailLabels({ r: -50, t: 0, peak: 'A' });
   close(a.edge.y, 135); close(a.y, 122);
   close(b.edge.y, 135); close(b.y, 122);
   close(a.leader.y1, 122); close(a.leader.y2, 135);
   close(b.leader.y1, 135); close(b.leader.y2, 122);
-  // a small negative height: edge below mid, so the label goes below
-  const dn = detailLabels({ r: -5, t: 0, peak: 'A' });
+  // a small positive (upward) height: edge below mid, so the label goes below
+  const dn = detailLabels({ r: 5, t: 0, peak: 'A' });
   assert.ok(dn.a.edge.y > MID);
   close(dn.a.y, MID + DETAIL.labelClear);
-  // r = -100: edge y 204, |204 - 162| = 42 >= 40 -> follows the edge
-  const neg = detailLabels({ r: -100, t: 0, peak: 'A' });
+  // r = 100 (up): edge y 204, |204 - 162| = 42 >= 40 -> follows the edge
+  const neg = detailLabels({ r: 100, t: 0, peak: 'A' });
   close(neg.a.edge.y, 204); close(neg.a.y, 204);
   close(neg.b.y, 204);
-  assert.equal(neg.a.value, `−100${NBSP}N/m`);
+  assert.equal(neg.a.value, `100${NBSP}N/m`);
 });
 
 test('r = t = 0: no outline, no arrows, labels at height 0 clamped above the beam', () => {
@@ -126,20 +126,20 @@ test('r = t = 0: no outline, no arrows, labels at height 0 clamped above the bea
 });
 
 test('a zero height anchors its label on the face the outline uses', () => {
-  // wA = 0, wB = -100: the outline triangle sits on the bottom face, so the corner is at 174 and the label below the middle
-  const dn = detailLabels({ r: 0, t: -100, peak: 'B' });
+  // wA = 0, wB = 100 (up): the outline triangle sits on the bottom face, so the corner is at 174 and the label below the middle
+  const dn = detailLabels({ r: 0, t: 100, peak: 'B' });
   close(dn.a.edge.y, DETAIL.beamY + BEAM_H); close(dn.a.edge.y, 174);
   close(dn.a.y, MID + DETAIL.labelClear); close(dn.a.y, 202);
   close(dn.b.edge.y, 204);
   close(dn.a.leader.y2, 174);
-  // wB = 0, wA = 100: top face, label above the middle
-  const up = detailLabels({ r: 0, t: 100, peak: 'A' });
+  // wB = 0, wA = -100 (down): top face, label above the middle
+  const up = detailLabels({ r: 0, t: -100, peak: 'A' });
   close(up.b.edge.y, DETAIL.beamY); close(up.b.edge.y, 150);
   close(up.b.y, MID - DETAIL.labelClear); close(up.b.y, 122);
   close(up.a.edge.y, 120);
-  // wA = 0, wB = 100 (top) and wB = 0, wA = -100 (bottom)
-  close(detailLabels({ r: 0, t: 100, peak: 'B' }).a.edge.y, 150);
-  close(detailLabels({ r: 0, t: -100, peak: 'A' }).b.edge.y, 174);
+  // wA = 0, wB = -100 (top) and wB = 0, wA = 100 (bottom)
+  close(detailLabels({ r: 0, t: -100, peak: 'B' }).a.edge.y, 150);
+  close(detailLabels({ r: 0, t: 100, peak: 'A' }).b.edge.y, 174);
   // both zero: both on the top face, both labels above
   const z = detailLabels({ r: 0, t: 0, peak: 'A' });
   close(z.a.edge.y, 150); close(z.b.edge.y, 150);
@@ -149,8 +149,8 @@ test('a zero height anchors its label on the face the outline uses', () => {
 });
 
 test('opposite signs: two triangles that meet at the zero crossing, one above and one below the beam', () => {
-  const s = { r: 100, t: -200, peak: 'B' };   // wA = 100, wB = -100
-  assert.deepEqual(detailHeights(s), { wA: 100, wB: -100 });
+  const s = { r: -100, t: 200, peak: 'B' };   // wA = -100 (down), wB = 100 (up)
+  assert.deepEqual(detailHeights(s), { wA: -100, wB: 100 });
   const polys = detailOutline(s);
   assert.equal(polys.length, 2);
   const [pos, neg] = polys;
@@ -158,17 +158,17 @@ test('opposite signs: two triangles that meet at the zero crossing, one above an
   assert.equal(xc, 380);
   assert.equal(pos.length, 3);
   assert.equal(neg.length, 3);
-  // positive triangle: wall edge up to the edge height, back down to the crossing, all on or above the top face
+  // downward triangle: wall edge up to the edge height, back down to the crossing, all on or above the top face
   assert.deepEqual(pos.map(p => p[0]), [250, 250, xc]);
   close(pos[0][1], DETAIL.beamY); close(pos[1][1], 120); close(pos[2][1], DETAIL.beamY);
   assert.ok(pos.every(p => p[1] <= DETAIL.beamY));
-  // negative triangle: from the crossing on the bottom face out to B
+  // upward triangle: from the crossing on the bottom face out to B
   const bot = DETAIL.beamY + BEAM_H;
   assert.deepEqual(neg.map(p => p[0]), [xc, XB, XB]);
   close(neg[0][1], bot); close(neg[1][1], bot + 30); close(neg[2][1], bot);
   assert.ok(neg.every(p => p[1] >= bot));
-  // mirrored signs: negative at A, positive at B
-  const m = detailOutline({ r: -100, t: 200, peak: 'B' });   // wA = -100, wB = 100
+  // mirrored signs: up at A, down at B
+  const m = detailOutline({ r: 100, t: -200, peak: 'B' });   // wA = 100, wB = -100
   assert.equal(m.length, 2);
   assert.ok(m[0].every(p => p[1] >= bot));
   assert.ok(m[1].every(p => p[1] <= DETAIL.beamY));
@@ -177,27 +177,27 @@ test('opposite signs: two triangles that meet at the zero crossing, one above an
 });
 
 test('opposite signs with unequal heights: the split is where the load crosses zero (w_A / (w_A - w_B) of the way), not at the middle', () => {
-  const s = { r: 100, t: -150, peak: 'B' };   // wA = 100, wB = -50: zero two thirds of the way along AB
-  assert.deepEqual(detailHeights(s), { wA: 100, wB: -50 });
+  const s = { r: -100, t: 150, peak: 'B' };   // wA = -100, wB = 50: zero two thirds of the way along AB
+  assert.deepEqual(detailHeights(s), { wA: -100, wB: 50 });
   const [pos, neg] = detailOutline(s);
   const xc = 250 + 260 * 2 / 3;
   close(pos[2][0], xc, 'positive triangle ends at the crossing');
   close(neg[0][0], xc, 'negative triangle starts at the crossing');
   assert.notEqual(Math.round(xc), 380, 'not the middle of AB');
-  // and the mirror: negative at A, so the crossing is one third of the way along
-  const [neg2, pos2] = detailOutline({ r: -100, t: 150, peak: 'B' });   // wA = -100, wB = 50
+  // and the mirror: up at A, so the crossing is one third of the way along
+  const [neg2, pos2] = detailOutline({ r: 100, t: -150, peak: 'B' });   // wA = 100, wB = -50
   close(neg2[2][0], 250 + 260 * 2 / 3);
   close(pos2[0][0], 250 + 260 * 2 / 3);
 });
 
-test('same signs: a trapezoid on the top face for a positive load, on the bottom face for a negative one', () => {
+test('same signs: a trapezoid on the top face for a downward (negative) load, on the bottom face for an upward one', () => {
   const top = detailOutline(DEFAULT);
   assert.equal(top.length, 1);
   assert.equal(top[0].length, 4);
   assert.deepEqual(top[0].map(p => p[0]), [250, 250, 510, 510]);
   close(top[0][0][1], DETAIL.beamY); close(top[0][1][1], 120); close(top[0][2][1], 90); close(top[0][3][1], DETAIL.beamY);
   const bot = DETAIL.beamY + BEAM_H;
-  const down = detailOutline({ r: -100, t: -100, peak: 'B' });   // wA = -100, wB = -200
+  const down = detailOutline({ r: 100, t: 100, peak: 'B' });   // wA = 100, wB = 200 (up): hangs below
   assert.equal(down.length, 1);
   assert.equal(down[0].length, 4);
   close(down[0][0][1], bot); close(down[0][1][1], bot + 30); close(down[0][2][1], bot + 60); close(down[0][3][1], bot);
@@ -205,17 +205,17 @@ test('same signs: a trapezoid on the top face for a positive load, on the bottom
 
 test('a zero end gives a triangle on the face the load sits on, with no repeated point', () => {
   const bot = DETAIL.beamY + BEAM_H;
-  const a0 = detailOutline({ r: 0, t: 100, peak: 'B' });   // wA = 0, wB = 100
+  const a0 = detailOutline({ r: 0, t: -100, peak: 'B' });   // wA = 0, wB = -100 (down)
   assert.equal(a0.length, 1);
   assert.equal(a0[0].length, 3);
   assert.deepEqual(a0[0].map(p => p[0]), [250, 510, 510]);
   close(a0[0][0][1], DETAIL.beamY); close(a0[0][1][1], 120); close(a0[0][2][1], DETAIL.beamY);
-  const b0 = detailOutline({ r: 0, t: -100, peak: 'A' });  // wA = -100, wB = 0
+  const b0 = detailOutline({ r: 0, t: 100, peak: 'A' });  // wA = 100 (up), wB = 0
   assert.equal(b0[0].length, 3);
   assert.deepEqual(b0[0].map(p => p[0]), [250, 250, 510]);
   close(b0[0][0][1], bot); close(b0[0][1][1], bot + 30); close(b0[0][2][1], bot);
-  // wA = 0, wB < 0: the triangle must sit on the bottom face, not the top
-  const c0 = detailOutline({ r: 0, t: -100, peak: 'B' });
+  // wA = 0, wB > 0 (up): the triangle must sit on the bottom face, not the top
+  const c0 = detailOutline({ r: 0, t: 100, peak: 'B' });
   assert.equal(c0[0].length, 3);
   assert.ok(c0[0].every(p => p[1] >= bot));
 });
@@ -240,27 +240,27 @@ test('arrows: the default state gives the 8-arrow rule (count, positions, length
     const w = loadAt(DEFAULT, m);
     assert.equal(ar.x, detailX(m));
     close(ar.yHead, DETAIL.beamY);
-    close(ar.yHead - ar.yTail, w * DETAIL.unit, `arrow ${i}`);
+    close(ar.yHead - ar.yTail, -w * DETAIL.unit, `arrow ${i}`);
   });
-  // a negative load: heads on the bottom face, tails below
-  const neg = detailArrows({ r: -100, t: 0, peak: 'A' });
+  // an upward load: heads on the bottom face, tails below
+  const neg = detailArrows({ r: 100, t: 0, peak: 'A' });
   assert.equal(neg.length, 8);
   for (const ar of neg) {
     close(ar.yHead, DETAIL.beamY + BEAM_H);
     close(ar.yTail - ar.yHead, 30);
   }
   // the arrow rule is layoutArrow's
-  assert.deepEqual(arrows[0], layoutArrow(detailX(0.125), loadAt(DEFAULT, 0.125), loadAt(DEFAULT, 0.125) * DETAIL.unit, DETAIL.beamY));
+  assert.deepEqual(arrows[0], layoutArrow(detailX(0.125), loadAt(DEFAULT, 0.125), -loadAt(DEFAULT, 0.125) * DETAIL.unit, DETAIL.beamY));
 });
 
 test('arrows shorter than minArrow are left out; a sign change leaves out the middle ones', () => {
-  // r = 20, t = 0: length 6 < 8 -> none
-  assert.deepEqual(detailArrows({ r: 20, t: 0, peak: 'A' }), []);
-  // r = 30: length 9 >= 8 -> all 8
-  assert.equal(detailArrows({ r: 30, t: 0, peak: 'A' }).length, 8);
+  // r = -20, t = 0: length 6 < 8 -> none
+  assert.deepEqual(detailArrows({ r: -20, t: 0, peak: 'A' }), []);
+  // r = -30: length 9 >= 8 -> all 8
+  assert.equal(detailArrows({ r: -30, t: 0, peak: 'A' }).length, 8);
   // wA = 200, wB = -200 (peak A, r = 0, t = 200 gives 200 -> 0; use r = 200, t = -400 not allowed; use r=-200,t=400): not on slider,
-  // so use wA = 100, wB = -100 through r = 100, t = -200 peak B: w at midpoints is +-87.5, +-62.5, +-37.5, +-12.5 (lengths 26.25, 18.75, 11.25, 3.75)
-  const arrows = detailArrows({ r: 100, t: -200, peak: 'B' });
+  // so use wA = -100, wB = 100 through r = -100, t = 200 peak B: w at midpoints is +-87.5, +-62.5, +-37.5, +-12.5 (lengths 26.25, 18.75, 11.25, 3.75)
+  const arrows = detailArrows({ r: -100, t: 200, peak: 'B' });
   assert.equal(arrows.length, 6);          // the two arrows next to the crossing are under 8 units
   assert.ok(arrows.slice(0, 3).every(a => a.yTail < a.yHead));
   assert.ok(arrows.slice(3).every(a => a.yTail > a.yHead));
@@ -329,11 +329,11 @@ test('grid: label y stays 20 units inside the figure and above the dimension lin
   assert.equal(clear + clamped, n);
 });
 
-test('monotonic: sorted by height, the label y never increases as the height increases (A, then B)', () => {
+test('monotonic: sorted by downward load (−w), the label y never increases as the downward load increases (A, then B)', () => {
   for (const [key, which] of [['wA', 'a'], ['wB', 'b']]) {
     const rows = GRID.map(s => ({ w: detailHeights(s)[key], y: detailLabels(s)[which].y }));
     assert.equal(rows.length, 81 * 81 * 2);
-    rows.sort((p, q) => p.w - q.w);
+    rows.sort((p, q) => q.w - p.w);
     // heights tie (a zero height's label depends on the other end), so compare group by group:
     // every label in a higher group is at or above (y at most) every label in the lower group
     const groups = [];

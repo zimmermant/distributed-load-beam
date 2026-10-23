@@ -1,5 +1,51 @@
 # Lab Notebook
 
+## 2026-10-23 - Off-beam edge marker, upward-positive signs, and the net moment about A (branch feat/off-beam-marker, not merged)
+
+### Summary
+Three requests from Todd, built on one branch, `feat/off-beam-marker` (from `main` at fc88aad); **nothing is merged or published**.
+1. **Off-the-beam marker** (31de2ad). When the combined force acts off the beam, the Combined card keeps the distance ("at x = −5.33 m from A") and draws a short horizontal arrow at that beam end pointing off it, labelled "off the beam / to the left" or "/ to the right", on the force's side (above for down, below for up). Todd picked this over a note by the beam or a fourth heading line. `format.js` gained `offSide(x)` (judged on the printed value, like `panelWhere`), `layout.js` `offBeamMarker` and `OFF`, `scene.js` `sceneOffBeam` (class `g off`).
+2. **Upward positive everywhere** (f684d43, `feat!`). Todd asked for moments counterclockwise positive and for loads and forces to be + up, − down; with x to the right of A a force's moment is then simply M = r·F. Sliders read −200 N/m (down) … +200 N/m (up), the figure note "(+ up, − down)", defaults r = t = −100 (the same picture: both loads down). **Links flip too** (Todd's choice): `?r=100` now means 100 N/m up, so any link posted before 2026-10-23 (Canvas embeds, old README examples) shows the mirror-image problem until its r and t are negated. README examples were negated.
+3. **Net moment about A** (90f4e8f). Symbol M (not τ), counterclockwise positive, printed `−333.33 N·m (clockwise)` / `+333.33 N·m (counterclockwise)` / `0 N·m`. Shown on the Combined card (two extra heading lines), as a "Net moment about A (counterclockwise +)" line in the main calculation, and on the detailed page as M_net = M_rect + M_tri = r_rect·F_rect + r_tri·F_tri with a plug-in line, then r_equiv = M_net / F_equiv. A couple shows its moment.
+
+Suite: 311 tests, all pass. Both browser harnesses clean (0 violations, every planted fault flagged) at 800×750, 1280×720 and 1000×700; a sweep of all 176 harness states found every page at or under the window height at 800×750 and 1280×720. Mutation audit: 986 rows, all caught; see below.
+
+### Decisions made
+- **Where the off-beam side is shown:** an edge arrow plus a two-line label (Todd's choice of three mock-ups). The heading's "(off the beam)" was dropped since the marker says it.
+- **Sign convention:** + up for loads and forces, counterclockwise + for moments (Todd). The force words on the cards ("300 N down") were already sign-free and did not change.
+- **Old links:** flip with the rest rather than keep the old meaning or add new parameter names (Todd: one rule everywhere).
+- **Spec calls approved by Todd:** defaults keep the same physical problem; whole moments without decimals, explicit + for counterclockwise, `0 N·m` with no direction; the "(worked from the unrounded locations)" note applies to the moment line by the same rule as r_equiv; the couple shows its moment; uniform card heights.
+- **Making room for the moment (Todd chose all three of three measured options):** with the moment line the calculation box became taller than the controls (the CSS rule that keeps the sticky row from covering the figure), and up to 70 of 176 states scrolled at 1280×720 (worst 773 px of 720). Changes: force scale 0.18 → 0.14 (band 84 ≥ the 80-unit tallest outline; viewBox 960×548); heading lines 20 apart; a shorter couple note ("The forces cancel but their moments do not: a couple, which no single force can replace."); from 1100 px the controls row spreads to 1060 px under the 740 px figure. Measured after: all 176 states fit both sizes.
+- Lints: N·m is now a unit (the dot-operator look-alike N⋅m stays an offence); M, M_rect, M_tri, M_equiv, M_net count as set-up variables.
+
+### Problems encountered
+- **The mutation audit had silently stopped working.** Under Node 26 the test runner prints the spec reporter by default, and `tools/mutations.mjs` parses TAP lines, so it found 0 tests: every row "MISSED", baseline "0 of 0". Fixed by pinning `--test-reporter=tap` (7a95da4). Any audit result produced under Node 26 before this fix is meaningless.
+- **Text-box estimate too small:** the off-beam marker's layout test assumed 13 units above the baseline and 4 below; Chromium measures 15.6 and 3.2 for a 16-unit label with halo, so an 18-unit line gap overlapped by 0.8 units in the browser while the unit test passed. The test now uses 16 + 4 and caught it; the marker was re-spaced (gap 34, line gap 20, 22 below the upward arrow, 15 above the downward one).
+- **Sign flip in tests:** 47 tests failed after the flip; each test's states were negated so it keeps describing the same physical load, rather than changing expectations, and comments/titles were corrected. The detail-page harness has its own copy of the edge geometry, which also had to flip (it reported 1044 violations until it did).
+- Trying the sign rule in the calculation box heading instead of the moment line made the heading wrap and was worse; reverted.
+
+### Open questions / next steps
+- **Merge and publish only on Todd's go-ahead.** Publishing changes the meaning of every existing link: before or right after publishing, negate r and t in any posted link (Canvas embeds).
+- Mutation audit, final full run after the fixes (e438186, `--coverage --strict`, about an hour): **all 986 rows caught, all 311 tests fail under at least one row**, exit 0 (raw output: docs/superpowers/mutation-coverage-run.txt). The first full run (985 rows) found: 'the unrounded note has no rnd class' now hit the M_net note, whose class no test checked (tests added on both pages, the row split per note); 'the net moment can be -0' was an equivalent mutant (removed); twelve rows over their failure limit because the new moment and grid tests also catch them (each given its own limit, observed + 4).
+- Not tried: Firefox, Safari, a real LMS frame. The "tall end" wording for a downward triangle (from 2026-10-21) is still open.
+- Source: docs/superpowers/specs/2026-10-23-moment-up-positive-design.md, README.md, tools/mutations.mjs.
+
+## 2026-10-21 - Merged and republished: detailed-calculation page live (public commit dc07ba5)
+
+### Summary
+`feat/detail-page` was merged into `main` with `--no-ff` (merge commit a1d5e1c; `main` had not moved since the fork at d0c42d5, so the merge was clean) at Todd's request ("merge and publish"), then published as public commit dc07ba5, a normal fast-forward push (c025043..dc07ba5) on top of the existing public history: no history rewrite, no force-push. Live: https://zimmermant.github.io/distributed-load-beam/ ; the detailed page is https://zimmermant.github.io/distributed-load-beam/dist/distributed_load_beam_detail.html . Both live dist files are byte-identical to the local build.
+
+### Decisions made
+- Same guarded method as the earlier republishes: clone the public repo into a scratch directory (no hardlinks), ASSERT the clone's top level is that directory and not this repo, export this repo's tracked files with `git archive HEAD`, delete `docs/`, rsync into the clone, check `git status` lists only expected files, run the tests there, scan the added lines and the tree for local paths and secret-like strings, commit, push. Pre-push checks: 293 of 293 tests pass in the public clone, its build is reproducible and byte-identical to this repo's dist (both files), zero local-path or secret-like hits in the added lines or the tree, no `docs/`, `.superpowers/`, `.claude/` or `CLAUDE.md` in the public tree. The lab notebook's added lines contained no local paths, so no scrub was needed this time.
+- This entry reaches the public copy with the next update.
+
+### Problems encountered
+None. (The shell's working directory reset to another project mid-way, so every later command used absolute paths.)
+
+### Open questions / next steps
+- On the live pages at 800x750 both browser harnesses are clean (main page: 176 combinations, 0 violations, sensitivity flagged, budget ok; detailed page: 176 combinations, 0 violations, sensitivity flagged, budget ok), the main page's link resolves to the detailed page with the current slider values, and the detailed page shows the "From the link" note for a link with values.
+- Optional follow-ups left from the final review: "tall end" wording for a negative triangle; an aria-live line on the detailed page; the figure's aria-label reads w_A as "w underscore A"; the 250 KB build check counts UTF-16 units. Not yet tried in a real Canvas iframe.
+
 ## 2026-10-21 - Detail page: final whole-branch review and one wording correction
 
 ### Summary

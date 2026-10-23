@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { stubElement, installSvgDocument } from './stub-dom.js';
 import { createScene } from '../src/scene.js';
 import { COLORS } from '../src/svg.js';
+import { momentWords } from '../src/format.js';
 import { BEAM_L, LOADED_L } from '../src/physics.js';
-import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, columnOutline, columnCard } from '../src/layout.js';
+import { BEAM_H, TOP, COLS, topX, colX, loadShapes, forceArrow, offBeamMarker, columnOutline, columnCard } from '../src/layout.js';
 import { derive } from '../src/state.js';
 
 installSvgDocument();
@@ -22,9 +23,9 @@ const texts = (svg) => svg.children.filter(n => n.tag === 'text');
 const walk = (n, fn) => { fn(n); n.children.forEach(c => walk(c, fn)); };
 
 const STATES = [
-  { r: 100, t: 100, peak: 'B' }, { r: 100, t: 100, peak: 'A' }, { r: -100, t: -50, peak: 'B' },
-  { r: 100, t: -200, peak: 'B' }, { r: 0, t: 0, peak: 'A' }, { r: 0, t: 100, peak: 'B' },
-  { r: -200, t: 0, peak: 'A' }, { r: 100, t: -190, peak: 'A' }, { r: -100, t: 100, peak: 'A' }
+  { r: -100, t: -100, peak: 'B' }, { r: -100, t: -100, peak: 'A' }, { r: 100, t: 50, peak: 'B' },
+  { r: -100, t: 200, peak: 'B' }, { r: 0, t: 0, peak: 'A' }, { r: 0, t: -100, peak: 'B' },
+  { r: 200, t: 0, peak: 'A' }, { r: -100, t: 190, peak: 'A' }, { r: 100, t: -100, peak: 'A' }
 ];
 
 test('every graphic element carries class g (except the six card elements) and every text class t or tin', () => {
@@ -103,8 +104,9 @@ test('texts are all inside the viewBox and none is empty', () => {
 });
 
 // ---- arrows ---------------------------------------------------------------------------
+// The vertical arrows (loads and forces); the horizontal off-the-beam arrow is class "off" and has its own tests.
 function arrowGroups(svg) {
-  return svg.children.filter(n => n.tag === 'g' && n.children.length === 2 && n.children[0].tag === 'line' && n.children[1].tag === 'path');
+  return svg.children.filter(n => n.tag === 'g' && !classes(n).includes('off') && n.children.length === 2 && n.children[0].tag === 'line' && n.children[1].tag === 'path');
 }
 function arrowOf(g) {
   const [line, path] = g.children;
@@ -165,7 +167,7 @@ test('equivalent-force arrows: fixed scale, right place, right colour, none for 
       close(a.x, w.a.x);
       close(Math.abs(a.yTip - a.yTail), COLS.fs * Math.abs(parts[w.k].F), 'length is fs·|F|');
       assert.equal(a.color, colors[w.k]);
-      assert.equal(a.yTip, parts[w.k].F > 0 ? COLS.beamY : COLS.beamY + BEAM_H);
+      assert.equal(a.yTip, parts[w.k].F < 0 ? COLS.beamY : COLS.beamY + BEAM_H);
     });
   }
   // the couple has no combined arrow; r=0,t=0 has none at all
@@ -203,9 +205,9 @@ test('the load shapes: rectangle and triangle, translucent, dashed, absent at ze
 const byText = (svg) => Object.fromEntries(texts(svg).map(n => [n.textContent, n]));
 
 test('top text block: heading, rectangular, triangular on two lines, sign note, all at TOP.textX', () => {
-  const t = byText(draw({ r: 100, t: 100, peak: 'B' }));
-  const rows = [['Actual load on AB', COLORS.ink, '700', -28], ['Rectangular: 100\u00a0N/m', COLORS.rect, '400', -6],
-    ['Triangular:', COLORS.tri, '400', 16], ['peak 100\u00a0N/m at B', COLORS.tri, '400', 38], ['(+ down, − up)', COLORS.ink, '400', 60]];
+  const t = byText(draw({ r: -100, t: -100, peak: 'B' }));
+  const rows = [['Actual load on AB', COLORS.ink, '700', -28], ['Rectangular: −100\u00a0N/m', COLORS.rect, '400', -6],
+    ['Triangular:', COLORS.tri, '400', 16], ['peak −100\u00a0N/m at B', COLORS.tri, '400', 38], ['(+ up, − down)', COLORS.ink, '400', 60]];
   for (const [str, fill, weight, dy] of rows) {
     assert.ok(t[str], `missing "${str}"`);
     assert.equal(num(t[str].attrs.x), TOP.textX, str);
@@ -213,7 +215,7 @@ test('top text block: heading, rectangular, triangular on two lines, sign note, 
     assert.equal(t[str].attrs.fill, fill, str);
     assert.equal(t[str].attrs['font-weight'], weight, str);
   }
-  assert.equal(t['(+ down, − up)'].attrs.opacity, '0.7');
+  assert.equal(t['(+ up, − down)'].attrs.opacity, '0.7');
   const a = byText(draw({ r: -200, t: -15, peak: 'A' }));
   assert.ok(a['Rectangular: −200\u00a0N/m'] && a['Triangular:'] && a['peak −15\u00a0N/m at A']);
 });
@@ -230,13 +232,13 @@ test('dimension texts sit under AB and BC, and BC is dimmed', () => {
   assert.equal(ab.attrs.opacity, undefined);
 });
 
-// the three text lines of every column, in order, as [text, x, y, fill, weight]
+// the heading lines of every column (three, and five on the Combined card), in order, as [text, x, y, fill, weight]
 function columnTexts(svg) {
   return texts(svg).filter(n => n.attrs.class === 't' && COLS.textY.includes(num(n.attrs.y)));
 }
 
-test('column texts: name, force and location at COLS.x[k] + the text pad on the three text rows', () => {
-  const svg = draw({ r: 100, t: 100, peak: 'B' });
+test('column texts: name, force and location at COLS.x[k] + the text pad on the first three rows; the net moment on rows 4 and 5 of Combined', () => {
+  const svg = draw({ r: -100, t: -100, peak: 'B' });
   const got = columnTexts(svg).map(n => [n.textContent, num(n.attrs.x), num(n.attrs.y), n.attrs.fill, n.attrs['font-weight']]);
   const want = [];
   [['Rectangular', '200\u00a0N down', 'at x = 1.00\u00a0m from A', COLORS.rect], ['Triangular', '100\u00a0N down', 'at x = 1.33\u00a0m from A', COLORS.tri],
@@ -244,20 +246,22 @@ test('column texts: name, force and location at COLS.x[k] + the text pad on the 
     const x = COLS.x[k] + 8;
     want.push([a, x, COLS.textY[0], color, '700'], [b, x, COLS.textY[1], color, '700'], [c, x, COLS.textY[2], COLORS.ink, '400']);
   });
+  const x2 = COLS.x[2] + 8;
+  want.push(['net moment about A:', x2, COLS.textY[3], COLORS.ink, '400'], ['−333.33\u00a0N·m (clockwise)', x2, COLS.textY[4], COLORS.comb, '700']);
   assert.deepEqual(got, want);
 });
 
 test('column texts: up forces, a zero part, a couple, and no load', () => {
   const third = (s) => columnTexts(draw(s)).filter(n => num(n.attrs.y) === COLS.textY[2]).map(n => n.textContent);
   const second = (s) => columnTexts(draw(s)).filter(n => num(n.attrs.y) === COLS.textY[1]).map(n => n.textContent);
-  assert.deepEqual(second({ r: -100, t: -50, peak: 'B' }), ['200\u00a0N up', '50\u00a0N up', '250\u00a0N up']);
-  assert.deepEqual(third({ r: 0, t: 100, peak: 'B' }), ['no load of this kind', 'at x = 1.33\u00a0m from A', 'at x = 1.33\u00a0m from A']);
-  assert.deepEqual(third({ r: 100, t: 0, peak: 'B' }), ['at x = 1.00\u00a0m from A', 'no load of this kind', 'at x = 1.00\u00a0m from A']);
-  assert.deepEqual(third({ r: 100, t: -200, peak: 'B' }), ['at x = 1.00\u00a0m from A', 'at x = 1.33\u00a0m from A', 'the parts cancel: no single force']);
-  assert.deepEqual(second({ r: 100, t: -200, peak: 'B' }), ['200\u00a0N down', '200\u00a0N up', '0\u00a0N']);
+  assert.deepEqual(second({ r: 100, t: 50, peak: 'B' }), ['200\u00a0N up', '50\u00a0N up', '250\u00a0N up']);
+  assert.deepEqual(third({ r: 0, t: -100, peak: 'B' }), ['no load of this kind', 'at x = 1.33\u00a0m from A', 'at x = 1.33\u00a0m from A']);
+  assert.deepEqual(third({ r: -100, t: 0, peak: 'B' }), ['at x = 1.00\u00a0m from A', 'no load of this kind', 'at x = 1.00\u00a0m from A']);
+  assert.deepEqual(third({ r: -100, t: 200, peak: 'B' }), ['at x = 1.00\u00a0m from A', 'at x = 1.33\u00a0m from A', 'the parts cancel: no single force']);
+  assert.deepEqual(second({ r: -100, t: 200, peak: 'B' }), ['200\u00a0N down', '200\u00a0N up', '0\u00a0N']);
   assert.deepEqual(third({ r: 0, t: 0, peak: 'A' }), ['no load of this kind', 'no load of this kind', 'no load']);
   assert.deepEqual(second({ r: 0, t: 0, peak: 'A' }), ['0\u00a0N', '0\u00a0N', '0\u00a0N']);
-  assert.deepEqual(third({ r: 100, t: -190, peak: 'B' }).slice(2), ['at x = −5.33\u00a0m from A (off the beam)']);
+  assert.deepEqual(third({ r: -100, t: 190, peak: 'B' }).slice(2), ['at x = −5.33\u00a0m from A']);
 });
 
 test('the columns are named Rectangular, Triangular and Combined', () => {
@@ -467,7 +471,7 @@ test('cards: draw order per column is card, band, beam copy, outlines, arrow, te
       const out = mine.filter(([n]) => classes(n).includes('outline')).map(([, i]) => i);
       const arrow = first(n => n.tag === 'g' && n.children[0] && n.children[0].attrs['stroke-width'] === '3.4');
       const txt = mine.filter(([n]) => n.tag === 'text' && n.attrs.class === 't').map(([, i]) => i);
-      assert.equal(txt.length, 3, `column ${k}: three heading lines`);
+      assert.equal(txt.length, k === 2 ? 5 : 3, `column ${k}: its heading lines`);
       for (const i of out) assert.ok(i > beamIx[k], 'outline after the beam');
       if (arrow >= 0) {
         for (const i of out) assert.ok(i < arrow, 'outline before the arrow');
@@ -489,15 +493,118 @@ test('cards: each card is the first thing of its column: nothing with a column x
   assert.ok(before.every(n => n.tag !== 'text' || !COLS.textY.includes(num(n.attrs.y))), 'no column text before the first card');
 });
 
-test('cards: the heading texts are left-padded: x = COLS.x[k] + 8, on the three baselines, every state', () => {
+test('cards: the heading texts are left-padded: x = COLS.x[k] + 8, on the baselines (three, five on Combined), every state', () => {
   for (const s of STATES) {
     const t = columnTexts(draw(s));
-    assert.equal(t.length, 9, JSON.stringify(s));
-    // columnTexts is in document order: column 0 rows 0-2, column 1 rows 0-2, column 2 rows 0-2
+    assert.equal(t.length, 11, JSON.stringify(s));
+    // columnTexts is in document order: column 0 rows 0-2, column 1 rows 0-2, column 2 rows 0-4
+    const cols = [t.slice(0, 3), t.slice(3, 6), t.slice(6)];
     for (let k = 0; k < 3; k++) {
-      const col = t.slice(k * 3, k * 3 + 3);
-      assert.deepEqual(col.map(n => num(n.attrs.x)), [COLUMN_TEXT_X[k], COLUMN_TEXT_X[k], COLUMN_TEXT_X[k]]);
-      assert.deepEqual(col.map(n => num(n.attrs.y)), COLS.textY);
+      const col = cols[k];
+      assert.deepEqual(col.map(n => num(n.attrs.x)), col.map(() => COLUMN_TEXT_X[k]));
+      assert.deepEqual(col.map(n => num(n.attrs.y)), COLS.textY.slice(0, k === 2 ? 5 : 3));
     }
   }
+});
+
+// ---- the off-the-beam marker -------------------------------------------------------------------
+const offGroups = (svg) => svg.children.filter(n => n.tag === 'g' && classes(n).includes('off'));
+const offTexts = (svg) => texts(svg).filter(n => n.attrs.class === 't' && !COLS.textY.includes(num(n.attrs.y)) && num(n.attrs.y) > COLS.textY[COLS.textY.length - 1]);
+
+test('off the beam: the distance stays in the heading and a horizontal arrow with "off the beam / to the left|right" is drawn', () => {
+  const cases = [
+    [{ r: -100, t: 190, peak: 'B' }, 'to the left', 'at x = −5.33\u00a0m from A'],    // 10 N down, left of A
+    [{ r: 100, t: -190, peak: 'B' }, 'to the left', 'at x = −5.33\u00a0m from A'],    // 10 N up, left of A
+    [{ r: 100, t: -190, peak: 'A' }, 'to the right', 'at x = 7.33\u00a0m from A'],    // 10 N up, beyond C
+    [{ r: -100, t: 190, peak: 'A' }, 'to the right', 'at x = 7.33\u00a0m from A']     // 10 N down, beyond C
+  ];
+  for (const [s, side, loc] of cases) {
+    const svg = draw(s);
+    const d = derive(s);
+    const m = offBeamMarker(2, d.comb.F, d.comb.x);
+    assert.ok(m, JSON.stringify(s));
+    assert.equal(columnTexts(svg).filter(n => num(n.attrs.y) === COLS.textY[2])[2].textContent, loc);
+    assert.equal(arrowGroups(svg).map(arrowOf).filter(a => a.color === COLORS.comb).length, 0, 'no vertical combined arrow');
+    const g = offGroups(svg);
+    assert.equal(g.length, 1, JSON.stringify(s));
+    assert.deepEqual(classes(g[0]), ['g', 'off']);
+    const [line, head] = g[0].children;
+    assert.equal(line.tag, 'line');
+    assert.equal(head.tag, 'path');
+    assert.equal(line.attrs.stroke, COLORS.comb);
+    assert.equal(head.attrs.fill, COLORS.comb);
+    assert.equal(num(line.attrs.y1), m.arrow.y);
+    assert.equal(num(line.attrs.y2), m.arrow.y, 'level');
+    assert.equal(num(line.attrs.x1), m.arrow.xTail);
+    const mm = head.attrs.d.match(/^M(\S+) (\S+) L(\S+) (\S+) L(\S+) (\S+) Z$/);
+    assert.ok(mm, head.attrs.d);
+    const [xb1, ya, xTip, yTip, xb2, yb] = mm.slice(1).map(Number);
+    assert.equal(xTip, m.arrow.xHead, 'the tip is at the head end');
+    assert.equal(yTip, m.arrow.y);
+    assert.equal(xb1, xb2, 'the head base is vertical');
+    assert.equal(num(line.attrs.x2), xb1, 'the shaft meets the head base');
+    close(m.arrow.y - ya, yb - m.arrow.y, 'the head is symmetric');
+    assert.ok(side === 'to the left' ? xb1 > xTip : xb1 < xTip, 'the head points off the beam');
+    const t = offTexts(svg);
+    assert.deepEqual(t.map(n => n.textContent), ['off the beam', side]);
+    t.forEach((n, i) => {
+      assert.equal(num(n.attrs.x), m.text.x);
+      assert.equal(num(n.attrs.y), m.text.y[i]);
+      assert.equal(n.attrs['text-anchor'], m.text.anchor);
+      assert.equal(n.attrs.fill, COLORS.comb);
+    });
+  }
+});
+
+test('on the beam, for a couple and for no load there is no off-the-beam marker', () => {
+  const onBeam = STATES.filter(s => { const x = derive(s).comb.x; return x === null || (x >= 0 && x <= BEAM_L); });
+  assert.equal(onBeam.length, STATES.length - 1, 'STATES holds one off-beam state (r −100, t 190, peak A)');
+  for (const s of [...onBeam, { r: 100, t: -150, peak: 'B' }, { r: -130, t: 190, peak: 'B' }]) {
+    const svg = draw(s);
+    assert.equal(offGroups(svg).length, 0, JSON.stringify(s));
+    assert.equal(offTexts(svg).length, 0, JSON.stringify(s));
+  }
+});
+
+test('the marker is drawn after the column beam and outlines, and its texts after its arrow', () => {
+  const kids = draw({ r: -100, t: 190, peak: 'B' }).children;
+  const ix = (pred) => kids.findIndex(pred);
+  const lastOutline = kids.map((n, i) => [n, i]).filter(([n]) => classes(n).includes('outline')).pop()[1];
+  const arrow = ix(n => classes(n).includes('off'));
+  const label = ix(n => n.tag === 'text' && n.textContent === 'off the beam');
+  assert.ok(lastOutline < arrow && arrow < label, `${lastOutline} ${arrow} ${label}`);
+});
+
+// ---- the net moment on the Combined card ---------------------------------------------------------
+test('the Combined card gives the net moment about A on rows 4 and 5; the other cards have no rows 4 and 5', () => {
+  const rows = (s) => columnTexts(draw(s)).filter(n => num(n.attrs.y) === COLS.textY[3] || num(n.attrs.y) === COLS.textY[4]);
+  const cases = [
+    [{ r: -100, t: -100, peak: 'B' }, '−333.33\u00a0N·m (clockwise)'],          // both loads down: clockwise
+    [{ r: 100, t: 100, peak: 'B' }, '+333.33\u00a0N·m (counterclockwise)'],     // both up: counterclockwise, with a +
+    [{ r: -100, t: 0, peak: 'A' }, '−200\u00a0N·m (clockwise)'],                // whole: no decimals
+    [{ r: -100, t: 200, peak: 'B' }, '+66.67\u00a0N·m (counterclockwise)'],     // a couple: no single force, but a moment
+    [{ r: 0, t: 0, peak: 'A' }, '0\u00a0N·m']                                    // no load
+  ];
+  for (const [s, value] of cases) {
+    const r = rows(s);
+    assert.deepEqual(r.map(n => n.textContent), ['net moment about A:', value], JSON.stringify(s));
+    assert.ok(r.every(n => num(n.attrs.x) === COLS.x[2] + COLS.textPad), 'on the Combined card');
+    assert.deepEqual(r.map(n => [n.attrs.fill, n.attrs['font-weight']]), [[COLORS.ink, '400'], [COLORS.comb, '700']]);
+  }
+  // the couple still says there is no single force on row 3
+  const couple = columnTexts(draw({ r: -100, t: 200, peak: 'B' })).filter(n => num(n.attrs.y) === COLS.textY[2]);
+  assert.equal(couple[2].textContent, 'the parts cancel: no single force');
+});
+
+test('the card moment is derive(s).M over the whole slider grid (momentWords of it), and never -0, NaN or a bare number', () => {
+  let n = 0;
+  for (const peak of ['A', 'B']) for (let r = -200; r <= 200; r += 25) for (let t = -200; t <= 200; t += 25) {
+    const s = { r, t, peak };
+    const row5 = columnTexts(draw(s)).filter(n => num(n.attrs.y) === COLS.textY[4]);
+    assert.equal(row5.length, 1);
+    assert.equal(row5[0].textContent, momentWords(derive(s).M), JSON.stringify(s));
+    assert.ok(!/-0|NaN|−0(?![.\d])/.test(row5[0].textContent), row5[0].textContent);
+    n++;
+  }
+  assert.equal(n, 2 * 17 * 17);
 });

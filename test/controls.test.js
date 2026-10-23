@@ -129,7 +129,7 @@ test('the thumb is put back when the state did not change (a drag inside the zer
 
 test('render: readouts, aria-valuetext, and the zero label class "on"', () => {
   const { parts, state, controls } = rig();
-  assert.equal(parts.rReadout.textContent, '100');
+  assert.equal(parts.rReadout.textContent, '−100', 'the default: 100 N/m down');
   assert.equal(parts.rZero.classes.has('on'), false);
   state.setR(-190);
   controls.render(state.getState());
@@ -180,7 +180,7 @@ test('the zero flags follow their own slider only', () => {
 test('each slider drives its own load, and each peak button its own peak', () => {
   const { parts, state, input } = rig();
   input(parts.rSlider, -50);
-  assert.deepEqual(state.getState(), { r: -50, t: 100, peak: 'B' });
+  assert.deepEqual(state.getState(), { r: -50, t: -100, peak: 'B' });
   input(parts.tSlider, 25);
   assert.deepEqual(state.getState(), { r: -50, t: 25, peak: 'B' });
   parts.peakA.fire('click');

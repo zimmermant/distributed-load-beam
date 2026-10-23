@@ -24,21 +24,46 @@ export function fmtFixed(n, dp = 2) {
   return s.startsWith('-') ? MINUS + s.slice(1) : s;
 }
 
-// Signed force (+ down) in words: "200 N down", "10 N up", "0 N".
+// Signed force (+ up) in words: "200 N up", "10 N down", "0 N".
 // Whole numbers print with no decimals, anything else with two.
 export function forceWords(F) {
   const mag = Math.abs(F);
   const dp = Number.isInteger(mag) ? 0 : 2;
   const text = fmt(mag, dp);
   if (text === '0' || text === '—') return `${text}${NBSP}N`;
-  return `${text}${NBSP}N ${F > 0 ? 'down' : 'up'}`;
+  return `${text}${NBSP}N ${F < 0 ? 'down' : 'up'}`;
 }
 
-// Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
+// A moment in N·m, counterclockwise positive: { text, dir }. text is the signed value with its unit, an explicit +
+// for counterclockwise ("+333.33 N·m", "−200 N·m"); dir is 'counterclockwise', 'clockwise', or '' for a moment that
+// prints as 0. Whole numbers print with no decimals, anything else with two (as forceWords).
+export function momentParts(M) {
+  const mag = Math.abs(M);
+  const text = fmt(mag, Number.isInteger(mag) ? 0 : 2);
+  if (text === '0' || text === '—') return { text: `${text}${NBSP}N·m`, dir: '' };
+  return M > 0
+    ? { text: `+${text}${NBSP}N·m`, dir: 'counterclockwise' }
+    : { text: `${MINUS}${text}${NBSP}N·m`, dir: 'clockwise' };
+}
+
+// A moment in words: "−333.33 N·m (clockwise)", "+60 N·m (counterclockwise)", "0 N·m".
+export function momentWords(M) {
+  const { text, dir } = momentParts(M);
+  return dir ? `${text} (${dir})` : text;
+}
+
+// Location in words; '' when there is none (x null). Off the beam the distance is printed the same way:
+// the figure's edge marker (layout.js offBeamMarker) says which side.
 export function locWords(x) {
   if (x === null || x === undefined) return '';
-  // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
+  return `at x = ${fmtFixed(x)}${NBSP}m from A`;
+}
+
+// 'left' (left of A), 'right' (beyond C) or null (on the beam, or no location). Judged on the printed
+// value, so a location that prints 0.00 or 4.00 is never called off the beam.
+export function offSide(x) {
+  if (x === null || x === undefined) return null;
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
-  return `at x = ${fmtFixed(x)}${NBSP}m from A${word ? ` (${word})` : ''}`;
+  if (shown < 0) return 'left';
+  return shown > BEAM_L ? 'right' : null;
 }

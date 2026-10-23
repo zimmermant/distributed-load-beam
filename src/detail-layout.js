@@ -3,7 +3,7 @@ import { LOADED_L, loadAt } from './physics.js';
 import { fmt, NBSP } from './format.js';
 
 // Geometry of the detail page's figure (the net load on AB), all in viewBox units with y growing downward.
-// Pure: no DOM. Sign convention as the main page: a positive (down) load sits ABOVE the beam, a negative one BELOW.
+// Pure: no DOM. Sign convention as the main page: a negative (down) load sits ABOVE the beam, a positive (up) one BELOW.
 // `band` is the room above and below the beam; labelClear is how close to the beam's middle a label may come;
 // labelADx / labelBDx are the label text's distances left of the wall (a) and right of B (b).
 export const DETAIL = {
@@ -21,11 +21,11 @@ export function detailHeights(s) {
   return { wA: loadAt(s, 0) + 0, wB: loadAt(s, LOADED_L) + 0 };
 }
 
-// y of the outer edge of a load of height w: above the top face for w > 0, below the bottom face for w < 0.
+// y of the outer edge of a load of height w: above the top face for w < 0 (down), below the bottom face for w > 0 (up).
 // w = 0 sits on the top face.
 export function detailEdgeY(w) {
-  if (w > 0) return DETAIL.beamY - w * DETAIL.unit;
-  if (w < 0) return DETAIL.beamY + BEAM_H - w * DETAIL.unit;
+  if (w < 0) return DETAIL.beamY + w * DETAIL.unit;
+  if (w > 0) return DETAIL.beamY + BEAM_H + w * DETAIL.unit;
   return DETAIL.beamY;
 }
 
@@ -40,13 +40,13 @@ export function detailOutline(s) {
   const bot = DETAIL.beamY + BEAM_H;
   if (wA * wB < 0) {
     const xc = xA + (xB - xA) * wA / (wA - wB);
-    const faceA = wA > 0 ? top : bot;
-    const faceB = wB > 0 ? top : bot;
+    const faceA = wA < 0 ? top : bot;
+    const faceB = wB < 0 ? top : bot;
     const first = [[xA, faceA], [xA, detailEdgeY(wA)], [xc, faceA]];
     const second = [[xc, faceB], [xB, detailEdgeY(wB)], [xB, faceB]];
     return [first, second];
   }
-  const face = wA + wB > 0 ? top : bot;
+  const face = wA + wB < 0 ? top : bot;
   const edge = w => (w === 0 ? face : detailEdgeY(w));
   const poly = [];
   for (const p of [[xA, face], [xA, edge(wA)], [xB, edge(wB)], [xB, face]]) {
@@ -86,7 +86,7 @@ export function detailLabels(s) {
   const xA = detailX(0);
   const xB = detailX(LOADED_L);
   // a zero height's corner is on the face the outline uses (bottom when the load is below the beam, else top)
-  const zeroY = wA + wB < 0 ? DETAIL.beamY + BEAM_H : DETAIL.beamY;
+  const zeroY = wA + wB > 0 ? DETAIL.beamY + BEAM_H : DETAIL.beamY;
   const eA = wA === 0 ? zeroY : detailEdgeY(wA);
   const eB = wB === 0 ? zeroY : detailEdgeY(wB);
   const yA = detailLabelY(eA);

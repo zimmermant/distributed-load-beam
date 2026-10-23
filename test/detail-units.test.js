@@ -29,8 +29,8 @@ const seen = { strings: 0, numbers: 0, minuses: 0 };
 const offenders = [];
 const plainSpace = [];
 const hyphens = [];      // an ASCII hyphen-minus directly before a digit in visible text (the true minus U+2212 is required)
-const wording = [];      // 'N per m' or 'N·m': the units on this page read N, N/m and m only
-const WORDING = /\bN per m\b|N[·⋅]m/;
+const wording = [];      // 'N per m' or 'N⋅m' (the dot operator, not the middle dot): the units on this page read N, N/m, m and N·m only
+const WORDING = /\bN per m\b|N⋅m/;
 function lint(str, where) {
   assert.equal(typeof str, 'string', where);
   seen.strings++;
@@ -79,9 +79,11 @@ test('the rule: "F = 200" is rejected, "F = 200 N" with a no-break space is acce
   lint(`F = −200${NBSP}N, w = (−5${NBSP}N/m), L = 2${NBSP}m, a-b, F_x - 1`, 'selfcheck');
   assert.equal(hyphens.length - before.h, 1, 'a true minus, a hyphen between letters and a spaced dash are fine');
   assert.equal(seen.minuses - before.m, 2);
-  lint(`a torque of 5${NBSP}N·m`, 'selfcheck');
+  lint(`a moment of 5${NBSP}N⋅m`, 'selfcheck');
   lint(`a load of 5${NBSP}N per m`, 'selfcheck');
-  assert.equal(wording.length - before.w, 2, "'N·m' and 'N per m' must each be an offence");
+  assert.equal(wording.length - before.w, 2, "'N⋅m' (the dot operator) and 'N per m' must each be an offence");
+  lint(`a moment of −5${NBSP}N·m (clockwise)`, 'selfcheck');
+  assert.equal(wording.length - before.w, 2, "'N·m' with the middle dot is the moment's unit, not an offence");
   lint(`a load of 5${NBSP}N/m over 2${NBSP}m, 3${NBSP}N · 2${NBSP}m`, 'selfcheck');
   assert.equal(wording.length - before.w, 2, 'N/m and the spaced product dot are fine');
   offenders.length = before.o;
@@ -140,11 +142,11 @@ const SETUP_NAMES = [
   /F_rect(?![A-Za-z])/, /F_tri(?![A-Za-z])/, /F_equiv(?![A-Za-z])/,
   /r_rect(?![A-Za-z])/, /r_tri(?![A-Za-z])/, /r_equiv(?![A-Za-z])/,
   /w_A(?![A-Za-z])/, /w_B(?![A-Za-z])/, /w_rect(?![A-Za-z])/, /w_tri(?![A-Za-z])/,
-  /(?<![A-Za-z_])L(?![A-Za-z_])/, /τ/
+  /(?<![A-Za-z_])L(?![A-Za-z_])/, /(?<![A-Za-z_])M(?:_(?:rect|tri|equiv|net))?(?![A-Za-z])/
 ];
 const hasVariable = (line) => SETUP_NAMES.some(re => re.test(line));
 
-test('every set-up line has no ASCII digit and names at least one variable (F_rect, ..., w_B, L, τ)', () => {
+test('every set-up line has no ASCII digit and names at least one variable (F_rect, ..., w_B, L, M, M_net)', () => {
   let lines = 0;
   const digit = [], bare = [];
   for (const s of STATES) {
@@ -161,7 +163,7 @@ test('every set-up line has no ASCII digit and names at least one variable (F_re
   assert.deepEqual([...new Set(bare)].slice(0, 3), [], `${bare.length} set-up line(s) name no variable`);
   assert.ok(lines >= 13122 * 11, `only ${lines} set-up lines`);
   // the variable matcher itself: it accepts a plain-text variable and rejects a sentence without one
-  assert.ok(hasVariable('F_rect = w_rect · L') && hasVariable('τ_equiv = τ_rect + τ_tri') && hasVariable('a force F at a distance r gives τ'));
+  assert.ok(hasVariable('F_rect = w_rect · L') && hasVariable('M_equiv = M_rect + M_tri') && hasVariable('a force F at a distance r gives a moment M'));
   assert.ok(!hasVariable('It acts at the centre of the rectangle, measured from A') && !hasVariable('F_x = 2'));
 });
 

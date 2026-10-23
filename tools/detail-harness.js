@@ -62,8 +62,8 @@
   const MIN_FIG_PX = 600;
   const MIN_TEXT_PX = 12;
   const GRID = [-200, -150, -100, -15, 0, 15, 100, 150, 200];
-  const NEAR_CANCEL = [[100, -190], [100, -195], [100, -200], [-100, 190], [-100, 195], [-100, 200], [-130, 190]];
-  const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+  const NEAR_CANCEL = [[-100, 190], [-100, 195], [-100, 200], [100, -190], [100, -195], [100, -200], [130, -190]];
+  const DEFAULTS = { r: -100, t: -100, peak: 'B' };
   const EXPECTED_COMBOS = 9 * 9 * 2 + 7 * 2;   // 176
   // Constants copied from src/detail-layout.js (DETAIL) and src/layout.js (BEAM_H); the independent recomputation.
   const G = { x0: 250, px: 130, beamY: 150, beamH: 24, unit: 0.3, labelClear: 40, labelADx: 44, labelBDx: 34, loadedL: 2 };
@@ -102,8 +102,8 @@
 
   // ---- the independent recomputation of the labels (same rule and constants as src/detail-layout.js) ----
   function edgeY(w) {
-    if (w > 0) return G.beamY - w * G.unit;
-    if (w < 0) return G.beamY + G.beamH - w * G.unit;
+    if (w < 0) return G.beamY + w * G.unit;              // + up: a downward (negative) height sits above the beam
+    if (w > 0) return G.beamY + G.beamH + w * G.unit;
     return G.beamY;
   }
   function labelY(edge) {
@@ -116,7 +116,7 @@
   function expected(r, t, peak) {
     const wA = peak === 'B' ? r : r + t, wB = peak === 'B' ? r + t : r;
     // a zero height's corner is on the face the outline uses (bottom when the load is below the beam, else top)
-    const zeroY = wA + wB < 0 ? G.beamY + G.beamH : G.beamY;
+    const zeroY = wA + wB > 0 ? G.beamY + G.beamH : G.beamY;
     const eA = wA === 0 ? zeroY : edgeY(wA);
     const eB = wB === 0 ? zeroY : edgeY(wB);
     const xA = G.x0, xB = G.x0 + G.loadedL * G.px;

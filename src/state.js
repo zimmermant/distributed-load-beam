@@ -1,6 +1,6 @@
 import { nextW, equivalents } from './physics.js';
 
-export const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+export const DEFAULTS = { r: -100, t: -100, peak: 'B' };   // both loads 100 N/m down (+ up)
 
 // Everything is derived from {r, t, peak}; nothing else is stored.
 export function derive(s) {

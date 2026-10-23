@@ -30,24 +30,24 @@
 //                and #calc show all their content, bottoms <= innerHeight, no horizontal scroll. (The row is position: sticky; bottom: 0, so a
 //                bottom <= innerHeight alone proves nothing: its rect is clamped to the viewport.)
 (function () {
-  const VB = { w: 960, h: 560 };
+  const VB = { w: 960, h: 548 };
   const TOL = 0.5;           // overlap counts only if the intersection exceeds this in x AND y
   const MIN_FIG_PX = 600;
   const MIN_TEXT_PX = 12;
   const GRID = [-200, -150, -100, -15, 0, 15, 100, 150, 200];
-  // near-cancel pairs, plus [-130, 190] whose combined force is at x = 0.10 m (its arrow is drawn close to the wall)
-  const NEAR_CANCEL = [[100, -190], [100, -195], [100, -200], [-100, 190], [-100, 195], [-100, 200], [-130, 190]];
-  const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+  // near-cancel pairs, plus [130, -190] whose combined force is at x = 0.10 m (its arrow is drawn close to the wall)
+  const NEAR_CANCEL = [[-100, 190], [-100, 195], [-100, 200], [100, -190], [100, -195], [100, -200], [130, -190]];
+  const DEFAULTS = { r: -100, t: -100, peak: 'B' };
   const EXPECTED_COMBOS = 9 * 9 * 2 + 7 * 2;   // 176: the grid plus the 7 near-cancel / near-wall pairs, both peaks
-  // The grid also holds r = 100, t = -150 (peak B): the combined force acts at x = 0, so its arrow is drawn at the wall end.
+  // The grid also holds r = -100, t = 150 (peak B): the combined force acts at x = 0, so its arrow is drawn at the wall end.
   // At x = 0 the head partly overlaps the wall rectangle: accepted, so the harness has no arrow-versus-wall check.
   const MIN_TEXTS = 20, MIN_GS = 20;   // non-vacuity floors: a checker that finds nothing to measure proves nothing
   const MIN_OUTLINES = 400;            // sweep floor: 142 of the 176 combos draw >= 3 dotted outlines, 32 draw 2 and 2 draw none; the real total is about 528, so 400 is a safe floor
   // Column geometry for check 7, the same numbers as COLS, BEAM_H and LOADED_L in src/layout.js
   // (test/layout.test.js reads this file and fails if they drift apart).
-  const COLS_X = [20, 330, 640], COLS_OFFSET = 30, COLS_PX = 60, COLS_BEAM_Y = 424, COLS_BAND = 108, BEAM_H = 24, LOADED_L = 2;
+  const COLS_X = [20, 330, 640], COLS_OFFSET = 30, COLS_PX = 60, COLS_BEAM_Y = 436, COLS_BAND = 84, BEAM_H = 24, LOADED_L = 2;
   // The column cards, the same numbers as COLS.card in src/layout.js (the drift test reads this line too).
-  const CARD_DX = -4, CARD_W = 300, CARD_Y = 240, CARD_BOTTOM = 558;
+  const CARD_DX = -4, CARD_W = 300, CARD_Y = 240, CARD_BOTTOM = 546;
   const MIN_IN_CARD = 40;              // check 9 floor: a figure holds 9 column texts, 9 letters and at least 27 beam-copy graphics below the top figure
   const OUTLINE_Y = [COLS_BEAM_Y - COLS_BAND, COLS_BEAM_Y + BEAM_H + COLS_BAND];
   const OUTLINE_X = COLS_X.map(x => [x + COLS_OFFSET, x + COLS_OFFSET + LOADED_L * COLS_PX]);

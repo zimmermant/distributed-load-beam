@@ -1,7 +1,7 @@
 import { LOADED_L } from './physics.js';
-import { NBSP, fmt, fmtFixed } from './format.js';
+import { NBSP, fmt, fmtFixed, momentParts } from './format.js';
 import { derive } from './state.js';
-import { panelPar, panelWhere, panelNeedsExact } from './panel.js';
+import { panelPar, panelWhere, panelNeedsExact, panelMomentNeedsExact } from './panel.js';
 import { detailHeights } from './detail-layout.js';
 
 // The detail page's three calculation blocks as pure text (no DOM). Every line is an HTML string
@@ -46,7 +46,7 @@ function detailRect(d, s) {
     `${rRect} = ½${DETAIL_DOT}${L} = ½${DETAIL_DOT}${detailLength()} = ${detailUnit(fmtFixed(LOADED_L / 2), 'm')}`
   ];
   const notes = d.rect.F === 0
-    ? [`There is no rectangular load, so ${fRect} = ${detailUnit('0', 'N')} and it adds no torque.`]
+    ? [`There is no rectangular load, so ${fRect} = ${detailUnit('0', 'N')} and it adds no moment.`]
     : [];
   return { key: 'rect', title: 'Calculating the rectangular loading', setup, plug, notes };
 }
@@ -75,7 +75,7 @@ function detailTri(d, s) {
     `${rTri} = ${where} = ${s.peak === 'A' ? '⅓' : '⅔'}${DETAIL_DOT}${detailLength()} = ${detailUnit(fmtFixed(s.peak === 'A' ? LOADED_L / 3 : 2 * LOADED_L / 3), 'm')}`
   ];
   const notes = d.tri.F === 0
-    ? [`There is no triangular load, so ${fTri} = ${detailUnit('0', 'N')} and it adds no torque.`]
+    ? [`There is no triangular load, so ${fTri} = ${detailUnit('0', 'N')} and it adds no moment.`]
     : [];
   return { key: 'tri', title: 'Calculating the triangular loading', setup, plug, notes };
 }
@@ -83,15 +83,16 @@ function detailTri(d, s) {
 function detailComb(d, s) {
   const fRect = detailV('F', 'rect'), fTri = detailV('F', 'tri'), fEq = detailV('F', 'equiv');
   const rRect = detailV('r', 'rect'), rTri = detailV('r', 'tri'), rEq = detailV('r', 'equiv');
-  const tRect = detailV('τ', 'rect'), tTri = detailV('τ', 'tri'), tEq = detailV('τ', 'equiv');
-  const F = detailV('F'), r = detailV('r'), tau = detailV('τ');
-  const formula = `(${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}) / ${fEq}`;
+  const mRect = detailV('M', 'rect'), mTri = detailV('M', 'tri'), mEq = detailV('M', 'equiv'), mNet = detailV('M', 'net');
+  const F = detailV('F'), r = detailV('r'), M = detailV('M');
+  const moments = `${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}`;
+  const formula = `(${moments}) / ${fEq}`;
   const setup = [
     `The single equivalent force replaces both loads, so it carries their total force: ${fEq} = ${fRect} + ${fTri}.`,
-    `It must also give the same torque about A as the loads it replaces. A force ${F} at a distance ${r} from A gives a torque ${tau} = ${r}${DETAIL_DOT}${F} (downward forces positive).`,
-    `${tEq} = ${tRect} + ${tTri}`,
-    `${rEq}${DETAIL_DOT}${fEq} = ${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}`,
-    `Solving for the location: ${rEq} = ${formula}.`
+    `It must also give the same moment about A as the loads it replaces. A force ${F} at a distance ${r} from A gives a moment ${M} = ${r}${DETAIL_DOT}${F} (upward forces and counterclockwise moments positive).`,
+    `The net moment of the two loads about A: ${mNet} = ${mRect} + ${mTri} = ${moments}`,
+    `${mEq} = ${mNet}, so ${rEq}${DETAIL_DOT}${fEq} = ${moments}`,
+    `Solving for the location: ${rEq} = ${mNet} / ${fEq} = ${formula}.`
   ];
   const noLoad = d.rect.F === 0 && d.tri.F === 0;
   // The two parts' locations are fixed by the geometry even when a part carries no force (its x in derive is null).
@@ -105,11 +106,18 @@ function detailComb(d, s) {
     given,
     `${fEq} = ${fRect} + ${fTri} = ${panelPar(d.rect.F, 'N')} + ${panelPar(d.tri.F, 'N')} = ${detailUnit(fmt(d.comb.F), 'N')}`
   ];
+  if (!noLoad) {
+    // the net moment, counterclockwise positive; the rounding note when the printed terms would not give the printed value
+    const { text, dir } = momentParts(d.M);
+    const exactM = panelMomentNeedsExact(d, s.peak) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+    const terms = `${detailUnit(fmtFixed(xRect), 'm')}${DETAIL_DOT}${panelPar(d.rect.F, 'N')} + ${detailUnit(fmtFixed(xTri), 'm')}${DETAIL_DOT}${panelPar(d.tri.F, 'N')}`;
+    plug.push(`${mNet} = ${moments} = ${terms} = ${text}${dir ? ` (${dir})` : ''}${exactM}`);
+  }
   const notes = [];
   if (noLoad) {
-    notes.push(`There is no load, so ${fEq} = ${detailUnit('0', 'N')} and there is nothing to replace.`);
+    notes.push(`There is no load, so ${fEq} = ${detailUnit('0', 'N')}, ${mNet} = ${momentParts(0).text} and there is nothing to replace.`);
   } else if (d.comb.F === 0) {
-    notes.push(`${fEq} = ${detailUnit('0', 'N')}: the two loads leave a couple, so no single force replaces them and there is no ${rEq}.`);
+    notes.push(`${fEq} = ${detailUnit('0', 'N')}: the two loads leave a couple, a moment ${mNet} with no net force, so no single force replaces them and there is no ${rEq}.`);
   } else {
     // panelNeedsExact reads both locations, so a part with no force gets its geometric location here.
     const full = { ...d, rect: { F: d.rect.F, x: xRect }, tri: { F: d.tri.F, x: xTri } };

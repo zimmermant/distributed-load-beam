@@ -6,13 +6,13 @@ import { equivalents } from '../src/physics.js';
 test('defaults equal DEFAULTS', () => {
   const st = createState();
   assert.deepEqual(st.getState(), DEFAULTS);
-  assert.deepEqual(DEFAULTS, { r: 100, t: 100, peak: 'B' });
+  assert.deepEqual(DEFAULTS, { r: -100, t: -100, peak: 'B' });   // both loads 100 N/m down (+ up)
 });
 
 test('getState returns a copy; mutating it does not change the store', () => {
   const st = createState();
   st.getState().r = 5;
-  assert.equal(st.getState().r, 100);
+  assert.equal(st.getState().r, -100);
 });
 
 test('setR / setT snap through nextW', () => {
@@ -41,10 +41,10 @@ test('a no-change set does not notify; a change does', () => {
   const st = createState();
   let calls = 0;
   st.subscribe(() => { calls++; });
-  st.setR(100);
-  st.setT(100);
+  st.setR(-100);
+  st.setT(-100);
   st.setPeak('B');
-  st.set({ r: 100, t: 100, peak: 'B' });
+  st.set({ r: -100, t: -100, peak: 'B' });
   assert.equal(calls, 0);
   st.setR(50);
   assert.equal(calls, 1);
@@ -82,7 +82,7 @@ test('subscribers receive the new state', () => {
   let seen = null;
   st.subscribe((s) => { seen = s; });
   st.setR(50);
-  assert.deepEqual(seen, { r: 50, t: 100, peak: 'B' });
+  assert.deepEqual(seen, { r: 50, t: -100, peak: 'B' });
 });
 
 test('set applies a snapped batch with one notification', () => {
@@ -118,7 +118,7 @@ test('a subscriber that changes the state it receives cannot corrupt the store',
   const st = createState();
   st.subscribe((s) => { s.r = 999; s.peak = 'Z'; });
   st.setR(50);
-  assert.deepEqual(st.getState(), { r: 50, t: 100, peak: 'B' });
+  assert.deepEqual(st.getState(), { r: 50, t: -100, peak: 'B' });
   st.setT(60);
   assert.deepEqual(st.getState(), { r: 50, t: 60, peak: 'B' });
 });
@@ -151,8 +151,8 @@ test('reset restores every field, including the peak and the rectangle', () => {
   const st = createState();
   st.set({ r: -50, t: 0, peak: 'A' });
   st.reset();
-  assert.deepEqual(st.getState(), { r: 100, t: 100, peak: 'B' });
+  assert.deepEqual(st.getState(), { r: -100, t: -100, peak: 'B' });
   st.setR(0);
   st.reset();
-  assert.equal(st.getState().r, 100);
+  assert.equal(st.getState().r, -100);
 });

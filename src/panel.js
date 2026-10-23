@@ -1,5 +1,5 @@
 import { LOADED_L, BEAM_L } from './physics.js';
-import { MINUS, NBSP, fmt, fmtFixed } from './format.js';
+import { MINUS, NBSP, fmt, fmtFixed, momentParts } from './format.js';
 import { derive } from './state.js';
 
 // The calculation, written out with the numbers substituted. Every number comes from
@@ -62,19 +62,42 @@ function panelComb(d) {
     `${panelWhere(d.comb.x)}${exact}`;
 }
 
-// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'note', html }]. Pure.
+// The parts' locations, fixed by the geometry even when a part carries no force (derive gives x = null then).
+export function panelPartX(peak) {
+  return { rect: LOADED_L / 2, tri: peak === 'A' ? LOADED_L / 3 : 2 * LOADED_L / 3 };
+}
+
+// True when the moment worked from the PRINTED (rounded) locations would not print the printed moment.
+export function panelMomentNeedsExact(d, peak) {
+  const x = panelPartX(peak);
+  const again = d.rect.F * Number(fmtFixed(x.rect)) + d.tri.F * Number(fmtFixed(x.tri));
+  return momentParts(again).text !== momentParts(d.M).text;
+}
+
+// The net moment about A, counterclockwise positive: M = r_rect × F_rect + r_tri × F_tri (forces + up).
+function panelMoment(d, s) {
+  const name = '<span class="c-comb"><b>Net moment about A</b></span>';
+  const { text, dir } = momentParts(d.M);
+  if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so M = ${text}.`;
+  const x = panelPartX(s.peak);
+  const sum = `${fmtFixed(x.rect)}${NBSP}${PANEL_M} × ${panelPar(d.rect.F, PANEL_N)} + ${fmtFixed(x.tri)}${NBSP}${PANEL_M} × ${panelPar(d.tri.F, PANEL_N)}`;
+  const exact = panelMomentNeedsExact(d, s.peak) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+  return `${name} (counterclockwise +): M = ${sum} = <b>${text}</b>${dir ? ` (${dir})` : ''}${exact}`;
+}
+
+// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'moment' | 'note', html }]. Pure.
 export function calcLines(s) {
   const d = derive(s);
   const lines = [
     { key: 'rect', html: panelRect(d, s) },
     { key: 'tri', html: panelTri(d, s) },
-    { key: 'comb', html: panelComb(d) }
+    { key: 'comb', html: panelComb(d) },
+    { key: 'moment', html: panelMoment(d, s) }
   ];
   if (d.couple) {
     lines.push({
       key: 'note',
-      html: 'Equal and opposite forces that act at different places do not cancel their turning effect: ' +
-        'together they leave a couple, which no single force can replace.'
+      html: 'The forces cancel but their moments do not: a couple, which no single force can replace.'
     });
   }
   return lines;

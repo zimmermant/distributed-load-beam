@@ -16,8 +16,10 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
    the title, the link note, the figure and the controls row, so their left edges line up):
    title, link note, the figure, then the controls and the calculation. Below 700 px those two are stacked.
    From 700 px up they sit side by side in a row that sticks to the bottom of the window, so the
-   controls stay in view while the figure scrolls. There is no wide-window column layout: the
-   figure stays 740 px wide wherever the window is at least 800 px wide (text >= 12 px). */
+   controls stay in view while the figure scrolls. The figure stays 740 px wide wherever the window is at
+   least 800 px wide (text >= 12 px). From 1100 px the controls row alone spreads to 1060 px, centred
+   under the figure, so the calculation (with the net moment line) wraps less and the page still fits
+   1280 x 720 in every state (Todd's call, 2026-10-23). */
 .page { max-width: 740px; margin: 0 auto; }
 .fig-col { max-width: 740px; margin: 0 auto; }
 #fig { display: block; width: 100%; height: auto; }
@@ -28,6 +30,9 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
     grid-template-columns: 1.1fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
     position: sticky; bottom: 0; z-index: 2; background: #ffffff; border-top: 1px solid #d5dbe3; box-shadow: 0 -4px 6px -4px #0003;
   }
+}
+@media (min-width: 1100px) {
+  .side { width: 1060px; max-width: none; margin-left: calc(50% - 530px); grid-template-columns: 1fr 1.55fr; }
 }
 
 /* ---- the "From the link" note: one small unboxed line under the title ---- */

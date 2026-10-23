@@ -23,8 +23,10 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
    the title, the link note, the figure and the controls row, so their left edges line up):
    title, link note, the figure, then the controls and the calculation. Below 700 px those two are stacked.
    From 700 px up they sit side by side in a row that sticks to the bottom of the window, so the
-   controls stay in view while the figure scrolls. There is no wide-window column layout: the
-   figure stays 740 px wide wherever the window is at least 800 px wide (text >= 12 px). */
+   controls stay in view while the figure scrolls. The figure stays 740 px wide wherever the window is at
+   least 800 px wide (text >= 12 px). From 1100 px the controls row alone spreads to 1060 px, centred
+   under the figure, so the calculation (with the net moment line) wraps less and the page still fits
+   1280 x 720 in every state (Todd's call, 2026-10-23). */
 .page { max-width: 740px; margin: 0 auto; }
 .fig-col { max-width: 740px; margin: 0 auto; }
 #fig { display: block; width: 100%; height: auto; }
@@ -35,6 +37,9 @@ h2 { margin: 0 0 4px; font-size: 15px; line-height: 1.3; font-weight: 600; }
     grid-template-columns: 1.1fr 1fr; align-items: start; margin-top: 0; padding: 5px 0 4px;
     position: sticky; bottom: 0; z-index: 2; background: #ffffff; border-top: 1px solid #d5dbe3; box-shadow: 0 -4px 6px -4px #0003;
   }
+}
+@media (min-width: 1100px) {
+  .side { width: 1060px; max-width: none; margin-left: calc(50% - 530px); grid-template-columns: 1fr 1.55fr; }
 }
 
 /* ---- the "From the link" note: one small unboxed line under the title ---- */
@@ -171,19 +176,19 @@ i.v { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
 </div>
 <section id="controls" class="panel" aria-label="Load controls">
   <div class="ctl">
-    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">100</b>&nbsp;N/m</div>
+    <div class="ctl-head"><label for="r-slider" class="c-rect"><b>Rectangular load</b></label> w = <b id="r-readout" class="readout">−100</b>&nbsp;N/m</div>
     <div class="zs">
       <i class="zt"></i>
-      <input type="range" id="r-slider" min="-200" max="200" step="5" value="100">
-      <div class="zl"><span>−200&nbsp;N/m (up)</span><span id="r-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (down)</span></div>
+      <input type="range" id="r-slider" min="-200" max="200" step="5" value="-100">
+      <div class="zl"><span>−200&nbsp;N/m (down)</span><span id="r-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (up)</span></div>
     </div>
   </div>
   <div class="ctl">
-    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">100</b>&nbsp;N/m</div>
+    <div class="ctl-head"><label for="t-slider" class="c-tri"><b>Triangular load</b></label> peak w = <b id="t-readout" class="readout">−100</b>&nbsp;N/m</div>
     <div class="zs">
       <i class="zt"></i>
-      <input type="range" id="t-slider" min="-200" max="200" step="5" value="100">
-      <div class="zl"><span>−200&nbsp;N/m (up)</span><span id="t-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (down)</span></div>
+      <input type="range" id="t-slider" min="-200" max="200" step="5" value="-100">
+      <div class="zl"><span>−200&nbsp;N/m (down)</span><span id="t-zero" class="zero-label">0&nbsp;N/m</span><span>+200&nbsp;N/m (up)</span></div>
     </div>
   </div>
   <div class="peak">
@@ -246,7 +251,8 @@ function loadAt(s, x) {
   return s.r + s.t * frac;
 }
 
-// Equivalent forces: signed F (+ down) and x in m from A (null when F is 0).
+// Equivalent forces: signed F (+ up, − down) and x in m from A (null when F is 0), and the net moment M about A in N·m.
+// With F positive up and x to the right of A, a force's moment is x·F, counterclockwise positive.
 // The combined location comes from summing moments about A. The triangle's
 // moment is written as t*L*L/3 (peak B) or t*L*L/6 (peak A), which equals
 // F_tri * x_tri but keeps round numbers exact (e.g. -12 rather than -11.999...).
@@ -262,7 +268,7 @@ function equivalents(s) {
   const tri = { F: triF, x: triF === 0 ? null : triX };
   const comb = { F: combF, x: combF === 0 ? null : (rectM + triM) / combF };
   const couple = combF === 0 && (rectF !== 0 || triF !== 0);
-  return { rect, tri, comb, couple };
+  return { rect, tri, comb, couple, M: rectM + triM + 0 };
 }
 
 // ===== format.js =====
@@ -292,23 +298,48 @@ function fmtFixed(n, dp = 2) {
   return s.startsWith('-') ? MINUS + s.slice(1) : s;
 }
 
-// Signed force (+ down) in words: "200 N down", "10 N up", "0 N".
+// Signed force (+ up) in words: "200 N up", "10 N down", "0 N".
 // Whole numbers print with no decimals, anything else with two.
 function forceWords(F) {
   const mag = Math.abs(F);
   const dp = Number.isInteger(mag) ? 0 : 2;
   const text = fmt(mag, dp);
   if (text === '0' || text === '—') return `${text}${NBSP}N`;
-  return `${text}${NBSP}N ${F > 0 ? 'down' : 'up'}`;
+  return `${text}${NBSP}N ${F < 0 ? 'down' : 'up'}`;
 }
 
-// Location in words; '' when there is none (x null). Flags a point off the beam (left of A or beyond C).
+// A moment in N·m, counterclockwise positive: { text, dir }. text is the signed value with its unit, an explicit +
+// for counterclockwise ("+333.33 N·m", "−200 N·m"); dir is 'counterclockwise', 'clockwise', or '' for a moment that
+// prints as 0. Whole numbers print with no decimals, anything else with two (as forceWords).
+function momentParts(M) {
+  const mag = Math.abs(M);
+  const text = fmt(mag, Number.isInteger(mag) ? 0 : 2);
+  if (text === '0' || text === '—') return { text: `${text}${NBSP}N·m`, dir: '' };
+  return M > 0
+    ? { text: `+${text}${NBSP}N·m`, dir: 'counterclockwise' }
+    : { text: `${MINUS}${text}${NBSP}N·m`, dir: 'clockwise' };
+}
+
+// A moment in words: "−333.33 N·m (clockwise)", "+60 N·m (counterclockwise)", "0 N·m".
+function momentWords(M) {
+  const { text, dir } = momentParts(M);
+  return dir ? `${text} (${dir})` : text;
+}
+
+// Location in words; '' when there is none (x null). Off the beam the distance is printed the same way:
+// the figure's edge marker (layout.js offBeamMarker) says which side.
 function locWords(x) {
   if (x === null || x === undefined) return '';
-  // Judge "off the beam" on the printed value, so "0.00 m ... (off the beam)" cannot happen.
+  return `at x = ${fmtFixed(x)}${NBSP}m from A`;
+}
+
+// 'left' (left of A), 'right' (beyond C) or null (on the beam, or no location). Judged on the printed
+// value, so a location that prints 0.00 or 4.00 is never called off the beam.
+function offSide(x) {
+  if (x === null || x === undefined) return null;
   const shown = Number(fmtFixed(x).replace(MINUS, '-'));
-  const word = shown < 0 || shown > BEAM_L ? 'off the beam' : '';
-  return `at x = ${fmtFixed(x)}${NBSP}m from A${word ? ` (${word})` : ''}`;
+  if (shown < 0) return 'left';
+  return shown > BEAM_L ? 'right' : null;
 }
 
 // ===== svg.js =====
@@ -363,7 +394,7 @@ function text(parent, x, y, str, opts = {}) {
 // ===== state.js =====
 
 
-const DEFAULTS = { r: 100, t: 100, peak: 'B' };
+const DEFAULTS = { r: -100, t: -100, peak: 'B' };   // both loads 100 N/m down (+ up)
 
 // Everything is derived from {r, t, peak}; nothing else is stored.
 function derive(s) {
@@ -498,21 +529,22 @@ function presetQuery(s) {
 // ===== layout.js =====
 
 
+
 // Figure geometry, all in viewBox units with y growing downward. Pure: no DOM.
-// Sign convention: a positive (down) load or force sits ABOVE the beam and its
-// arrow head touches the beam's top face; a negative one sits BELOW and the head
+// Sign convention (+ up): a negative (down) load or force sits ABOVE the beam and its
+// arrow head touches the beam's top face; a positive (up) one sits BELOW and the head
 // touches the beam's bottom face.
-const VB = { w: 960, h: 560 };
+const VB = { w: 960, h: 548 };
 const BEAM_H = 24;
 // top figure (the actual load); `band` is the room above and below the beam
 const TOP = { x0: 90, px: 150, beamY: 90, unit: 0.2, band: 80, dimY: 206, dimTextY: 228, textX: 730 };
 // three columns (the equivalent forces); fs is the FIXED force scale, units per newton
 // `card` is the framed, tinted card around each column: dx from COLS.x[k] to its left edge, w its width, y its top, bottom its
 // lower edge (its stroke must stay inside VB.h), rx the corner radius, headH the height of the heading band that holds the three
-// text lines (it must end above COLS.beamY - COLS.band), stroke the frame width. textPad is the left padding of those lines.
+// text lines (three, five on the Combined card, whose rows 4 and 5 give the net moment; it must end above COLS.beamY - COLS.band), stroke the frame width. textPad is the left padding of those lines.
 const COLS = {
-  x: [20, 330, 640], offset: 30, px: 60, beamY: 424, fs: 0.18, band: 108, textY: [262, 284, 306], textPad: 8,
-  card: { dx: -4, w: 300, y: 240, bottom: 558, rx: 8, headH: 74, stroke: 1.5 }
+  x: [20, 330, 640], offset: 30, px: 60, beamY: 436, fs: 0.14, band: 84, textY: [262, 282, 302, 322, 342], textPad: 8,
+  card: { dx: -4, w: 300, y: 240, bottom: 546, rx: 8, headH: 110, stroke: 1.5 }
 };
 
 const LAYOUT_MIN_ARROW = 8;   // net-load arrows shorter than this are not drawn
@@ -536,8 +568,8 @@ function columnCard(k) {
 
 // One arrow of length len pointing at the beam from the side the sign says.
 function layoutArrow(x, signed, len, beamY) {
-  const yHead = signed > 0 ? beamY : beamY + BEAM_H;
-  const yTail = signed > 0 ? yHead - len : yHead + len;
+  const yHead = signed < 0 ? beamY : beamY + BEAM_H;
+  const yTail = signed < 0 ? yHead - len : yHead + len;
   return { x, yTail, yHead };
 }
 
@@ -552,13 +584,13 @@ function loadShapes(s) {
 
   let rect = null;
   if (s.r !== 0) {
-    rect = { x: x0, y: s.r > 0 ? beamTop - rh : beamBot, w: x2 - x0, h: rh };
+    rect = { x: x0, y: s.r < 0 ? beamTop - rh : beamBot, w: x2 - x0, h: rh };
   }
 
   let tri = null;
   if (s.t !== 0) {
-    const up = s.t > 0;                                  // triangle above the beam
-    const stacked = s.r !== 0 && (s.r > 0) === up;       // same side as the rectangle
+    const up = s.t < 0;                                  // triangle above the beam (a downward load)
+    const stacked = s.r !== 0 && (s.r < 0) === up;       // same side as the rectangle
     const face = up ? beamTop : beamBot;
     const base = stacked ? (up ? beamTop - rh : beamBot + rh) : face;
     const apexY = up ? base - th : base + th;
@@ -577,7 +609,7 @@ function loadShapes(s) {
   return { rect, tri, arrows };
 }
 
-// Equivalent force F (signed, + down) at x metres from A in column k, or null
+// Equivalent force F (signed, + up) at x metres from A in column k, or null
 // when there is nothing to draw (no force, no location, or a location off the beam). At x = 0
 // the head partly overlaps the wall rectangle: accepted, not a defect.
 function forceArrow(k, F, x) {
@@ -585,15 +617,41 @@ function forceArrow(k, F, x) {
   return layoutArrow(colX(k, x), F, COLS.fs * Math.abs(F), COLS.beamY);
 }
 
+// The off-the-beam marker: a horizontal arrow `len` long whose head sits `textPad` inside the card edge (left) or
+// the same distance inside the right edge, `gap` from the beam face on the force's side, and two label lines
+// `lineGap` apart beyond it (further from the beam). The numbers keep it clear of the heading band, the wall
+// and the dotted outline for every off-beam slider state (test/layout.test.js checks all 614).
+const OFF = { gap: 34, len: 60, lineGap: 20, textBelow: 22, textAbove: 15 };
+
+// Column k's force F at x metres from A, when x is off the beam: { side, lines, arrow: { y, xTail, xHead },
+// text: { x, anchor, y: [y0, y1] } }; null when there is no force, no location, or the location is on the beam.
+function offBeamMarker(k, F, x) {
+  const side = offSide(x);
+  if (F === 0 || side === null) return null;
+  const c = columnCard(k);
+  const inset = COLS.x[k] + COLS.textPad - c.x;
+  const xHead = side === 'left' ? c.x + inset : c.x + c.w - inset;
+  const xTail = side === 'left' ? xHead + OFF.len : xHead - OFF.len;
+  const down = F < 0;
+  const y = down ? COLS.beamY - OFF.gap : COLS.beamY + BEAM_H + OFF.gap;
+  const y1 = down ? y - OFF.textAbove : y + OFF.textBelow + OFF.lineGap;
+  return {
+    side,
+    lines: ['off the beam', `to the ${side}`],
+    arrow: { y, xTail, xHead },
+    text: { x: xHead, anchor: side === 'left' ? 'start' : 'end', y: [y1 - OFF.lineGap, y1] }
+  };
+}
+
 // One piece of a load outline in column k: the load runs from xa to xb metres with signed
 // intensity wa at xa and wb at xb (same sign, either may be 0). The base lies on the beam face the
-// load pushes from (top for +, bottom for -); the height is the intensity at the top figure's scale.
+// load pushes from (top for − (down), bottom for + (up)); the height is the intensity at the top figure's scale.
 // A zero end contributes no point, so a piece with one zero end is a triangle, never a degenerate shape.
 function layoutPiece(k, xa, xb, wa, wb) {
-  const base = wa + wb > 0 ? COLS.beamY : COLS.beamY + BEAM_H;
+  const base = wa + wb < 0 ? COLS.beamY : COLS.beamY + BEAM_H;
   const poly = [[colX(k, xa), base]];
-  if (wa !== 0) poly.push([colX(k, xa), base - wa * TOP.unit]);
-  if (wb !== 0) poly.push([colX(k, xb), base - wb * TOP.unit]);
+  if (wa !== 0) poly.push([colX(k, xa), base + wa * TOP.unit]);
+  if (wb !== 0) poly.push([colX(k, xb), base + wb * TOP.unit]);
   poly.push([colX(k, xb), base]);
   return poly;
 }
@@ -644,6 +702,7 @@ const SCENE_HEAD_MAX = 9;         // arrow head length cap
 const SCENE_CARD_FILL = 0.05;     // the column card's tint
 const SCENE_CARD_STROKE = 0.45;   // the column card's frame opacity
 const SCENE_CARD_HEAD = 0.12;     // the heading band's tint
+const SCENE_OFF_W = 2.4;          // shaft width of the off-the-beam arrow (thinner than a force arrow: it is not a force)
 
 // A text node with its class set (svg.js's text() takes no class option).
 function sceneText(parent, x, y, str, opts, cls = 't') {
@@ -661,6 +720,20 @@ function sceneArrow(parent, a, color, width) {
   const g = el('g', { class: 'g' }, parent);
   el('line', { x1: a.x, y1: a.yTail, x2: a.x, y2: yBase, stroke: color, 'stroke-width': width }, g);
   el('path', { d: `M${a.x - half} ${yBase} L${a.x} ${a.yHead} L${a.x + half} ${yBase} Z`, fill: color }, g);
+  return g;
+}
+
+// The off-the-beam marker m (layout.js offBeamMarker): a level arrow, class "g off", pointing off the beam,
+// then its two label lines in the column colour.
+function sceneOffBeam(parent, m, color) {
+  const a = m.arrow;
+  const dir = a.xHead > a.xTail ? 1 : -1;
+  const xBase = a.xHead - dir * SCENE_HEAD_MAX;
+  const half = SCENE_OFF_W * 1.6 + 1;
+  const g = el('g', { class: 'g off' }, parent);
+  el('line', { x1: a.xTail, y1: a.y, x2: xBase, y2: a.y, stroke: color, 'stroke-width': SCENE_OFF_W }, g);
+  el('path', { d: `M${xBase} ${a.y - half} L${a.xHead} ${a.y} L${xBase} ${a.y + half} Z`, fill: color }, g);
+  m.lines.forEach((str, i) => sceneText(parent, m.text.x, m.text.y[i], str, { fill: color, anchor: m.text.anchor }));
   return g;
 }
 
@@ -704,7 +777,8 @@ function sceneTopLines(s) {
   return lines;
 }
 
-// The three text lines of equivalent-force column k: name, force, location.
+// The heading lines of equivalent-force column k: name, force, location; the Combined card adds the net moment about A
+// (a label, then the value), which a couple has too.
 function sceneColumnLines(name, part, d) {
   const F = part.F;
   let third;
@@ -714,7 +788,9 @@ function sceneColumnLines(name, part, d) {
   } else {
     third = locWords(part.x);
   }
-  return [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
+  const lines = [name, F === 0 ? `0${NBSP}N` : forceWords(F), third];
+  if (name === 'Combined') lines.push('net moment about A:', momentWords(d.M));
+  return lines;
 }
 
 function sceneTop(svg, s) {
@@ -754,7 +830,7 @@ function sceneTop(svg, s) {
   lines.forEach(([str, color, bold], i) => {
     sceneText(svg, TOP.textX, TOP.beamY + dy[i], str, { fill: color, weight: bold ? 700 : 400 });
   });
-  sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ down, − up)', {}).setAttribute('opacity', 0.7);
+  sceneText(svg, TOP.textX, TOP.beamY + dy[lines.length], '(+ up, − down)', {}).setAttribute('opacity', 0.7);
 }
 
 // A dotted, unfilled outline of one layout polygon (its points as given, closed with Z).
@@ -794,10 +870,13 @@ function sceneColumns(svg, d, s) {
     for (const poly of columnOutline(k, s)) sceneOutline(svg, poly, color);
     const a = forceArrow(k, part.F, part.x);
     if (a) sceneArrow(svg, a, color, 3.4);
+    const m = offBeamMarker(k, part.F, part.x);
+    if (m) sceneOffBeam(svg, m, color);
     const lines = sceneColumnLines(name, part, d);
     lines.forEach((str, i) => {
       if (str === '') return;
-      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: i < 2 ? color : COLORS.ink, weight: i < 2 ? 700 : 400 });
+      const strong = i < 2 || i === 4;                // name, force and the moment's value; the location and the moment's label are plain
+      sceneText(svg, COLS.x[k] + COLS.textPad, COLS.textY[i], str, { fill: strong ? color : COLORS.ink, weight: strong ? 700 : 400 });
     });
   });
 }
@@ -878,19 +957,42 @@ function panelComb(d) {
     `${panelWhere(d.comb.x)}${exact}`;
 }
 
-// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'note', html }]. Pure.
+// The parts' locations, fixed by the geometry even when a part carries no force (derive gives x = null then).
+function panelPartX(peak) {
+  return { rect: LOADED_L / 2, tri: peak === 'A' ? LOADED_L / 3 : 2 * LOADED_L / 3 };
+}
+
+// True when the moment worked from the PRINTED (rounded) locations would not print the printed moment.
+function panelMomentNeedsExact(d, peak) {
+  const x = panelPartX(peak);
+  const again = d.rect.F * Number(fmtFixed(x.rect)) + d.tri.F * Number(fmtFixed(x.tri));
+  return momentParts(again).text !== momentParts(d.M).text;
+}
+
+// The net moment about A, counterclockwise positive: M = r_rect × F_rect + r_tri × F_tri (forces + up).
+function panelMoment(d, s) {
+  const name = '<span class="c-comb"><b>Net moment about A</b></span>';
+  const { text, dir } = momentParts(d.M);
+  if (d.rect.F === 0 && d.tri.F === 0) return `${name}: there is no load, so M = ${text}.`;
+  const x = panelPartX(s.peak);
+  const sum = `${fmtFixed(x.rect)}${NBSP}${PANEL_M} × ${panelPar(d.rect.F, PANEL_N)} + ${fmtFixed(x.tri)}${NBSP}${PANEL_M} × ${panelPar(d.tri.F, PANEL_N)}`;
+  const exact = panelMomentNeedsExact(d, s.peak) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+  return `${name} (counterclockwise +): M = ${sum} = <b>${text}</b>${dir ? ` (${dir})` : ''}${exact}`;
+}
+
+// s = { r, t, peak } -> [{ key: 'rect' | 'tri' | 'comb' | 'moment' | 'note', html }]. Pure.
 function calcLines(s) {
   const d = derive(s);
   const lines = [
     { key: 'rect', html: panelRect(d, s) },
     { key: 'tri', html: panelTri(d, s) },
-    { key: 'comb', html: panelComb(d) }
+    { key: 'comb', html: panelComb(d) },
+    { key: 'moment', html: panelMoment(d, s) }
   ];
   if (d.couple) {
     lines.push({
       key: 'note',
-      html: 'Equal and opposite forces that act at different places do not cancel their turning effect: ' +
-        'together they leave a couple, which no single force can replace.'
+      html: 'The forces cancel but their moments do not: a couple, which no single force can replace.'
     });
   }
   return lines;
@@ -982,7 +1084,7 @@ function createControls(root, state, parts) {
 
 
 // Geometry of the detail page's figure (the net load on AB), all in viewBox units with y growing downward.
-// Pure: no DOM. Sign convention as the main page: a positive (down) load sits ABOVE the beam, a negative one BELOW.
+// Pure: no DOM. Sign convention as the main page: a negative (down) load sits ABOVE the beam, a positive (up) one BELOW.
 // `band` is the room above and below the beam; labelClear is how close to the beam's middle a label may come;
 // labelADx / labelBDx are the label text's distances left of the wall (a) and right of B (b).
 const DETAIL = {
@@ -1000,11 +1102,11 @@ function detailHeights(s) {
   return { wA: loadAt(s, 0) + 0, wB: loadAt(s, LOADED_L) + 0 };
 }
 
-// y of the outer edge of a load of height w: above the top face for w > 0, below the bottom face for w < 0.
+// y of the outer edge of a load of height w: above the top face for w < 0 (down), below the bottom face for w > 0 (up).
 // w = 0 sits on the top face.
 function detailEdgeY(w) {
-  if (w > 0) return DETAIL.beamY - w * DETAIL.unit;
-  if (w < 0) return DETAIL.beamY + BEAM_H - w * DETAIL.unit;
+  if (w < 0) return DETAIL.beamY + w * DETAIL.unit;
+  if (w > 0) return DETAIL.beamY + BEAM_H + w * DETAIL.unit;
   return DETAIL.beamY;
 }
 
@@ -1019,13 +1121,13 @@ function detailOutline(s) {
   const bot = DETAIL.beamY + BEAM_H;
   if (wA * wB < 0) {
     const xc = xA + (xB - xA) * wA / (wA - wB);
-    const faceA = wA > 0 ? top : bot;
-    const faceB = wB > 0 ? top : bot;
+    const faceA = wA < 0 ? top : bot;
+    const faceB = wB < 0 ? top : bot;
     const first = [[xA, faceA], [xA, detailEdgeY(wA)], [xc, faceA]];
     const second = [[xc, faceB], [xB, detailEdgeY(wB)], [xB, faceB]];
     return [first, second];
   }
-  const face = wA + wB > 0 ? top : bot;
+  const face = wA + wB < 0 ? top : bot;
   const edge = w => (w === 0 ? face : detailEdgeY(w));
   const poly = [];
   for (const p of [[xA, face], [xA, edge(wA)], [xB, edge(wB)], [xB, face]]) {
@@ -1065,7 +1167,7 @@ function detailLabels(s) {
   const xA = detailX(0);
   const xB = detailX(LOADED_L);
   // a zero height's corner is on the face the outline uses (bottom when the load is below the beam, else top)
-  const zeroY = wA + wB < 0 ? DETAIL.beamY + BEAM_H : DETAIL.beamY;
+  const zeroY = wA + wB > 0 ? DETAIL.beamY + BEAM_H : DETAIL.beamY;
   const eA = wA === 0 ? zeroY : detailEdgeY(wA);
   const eB = wB === 0 ? zeroY : detailEdgeY(wB);
   const yA = detailLabelY(eA);
@@ -1209,7 +1311,7 @@ function detailRect(d, s) {
     `${rRect} = ½${DETAIL_DOT}${L} = ½${DETAIL_DOT}${detailLength()} = ${detailUnit(fmtFixed(LOADED_L / 2), 'm')}`
   ];
   const notes = d.rect.F === 0
-    ? [`There is no rectangular load, so ${fRect} = ${detailUnit('0', 'N')} and it adds no torque.`]
+    ? [`There is no rectangular load, so ${fRect} = ${detailUnit('0', 'N')} and it adds no moment.`]
     : [];
   return { key: 'rect', title: 'Calculating the rectangular loading', setup, plug, notes };
 }
@@ -1238,7 +1340,7 @@ function detailTri(d, s) {
     `${rTri} = ${where} = ${s.peak === 'A' ? '⅓' : '⅔'}${DETAIL_DOT}${detailLength()} = ${detailUnit(fmtFixed(s.peak === 'A' ? LOADED_L / 3 : 2 * LOADED_L / 3), 'm')}`
   ];
   const notes = d.tri.F === 0
-    ? [`There is no triangular load, so ${fTri} = ${detailUnit('0', 'N')} and it adds no torque.`]
+    ? [`There is no triangular load, so ${fTri} = ${detailUnit('0', 'N')} and it adds no moment.`]
     : [];
   return { key: 'tri', title: 'Calculating the triangular loading', setup, plug, notes };
 }
@@ -1246,15 +1348,16 @@ function detailTri(d, s) {
 function detailComb(d, s) {
   const fRect = detailV('F', 'rect'), fTri = detailV('F', 'tri'), fEq = detailV('F', 'equiv');
   const rRect = detailV('r', 'rect'), rTri = detailV('r', 'tri'), rEq = detailV('r', 'equiv');
-  const tRect = detailV('τ', 'rect'), tTri = detailV('τ', 'tri'), tEq = detailV('τ', 'equiv');
-  const F = detailV('F'), r = detailV('r'), tau = detailV('τ');
-  const formula = `(${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}) / ${fEq}`;
+  const mRect = detailV('M', 'rect'), mTri = detailV('M', 'tri'), mEq = detailV('M', 'equiv'), mNet = detailV('M', 'net');
+  const F = detailV('F'), r = detailV('r'), M = detailV('M');
+  const moments = `${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}`;
+  const formula = `(${moments}) / ${fEq}`;
   const setup = [
     `The single equivalent force replaces both loads, so it carries their total force: ${fEq} = ${fRect} + ${fTri}.`,
-    `It must also give the same torque about A as the loads it replaces. A force ${F} at a distance ${r} from A gives a torque ${tau} = ${r}${DETAIL_DOT}${F} (downward forces positive).`,
-    `${tEq} = ${tRect} + ${tTri}`,
-    `${rEq}${DETAIL_DOT}${fEq} = ${rRect}${DETAIL_DOT}${fRect} + ${rTri}${DETAIL_DOT}${fTri}`,
-    `Solving for the location: ${rEq} = ${formula}.`
+    `It must also give the same moment about A as the loads it replaces. A force ${F} at a distance ${r} from A gives a moment ${M} = ${r}${DETAIL_DOT}${F} (upward forces and counterclockwise moments positive).`,
+    `The net moment of the two loads about A: ${mNet} = ${mRect} + ${mTri} = ${moments}`,
+    `${mEq} = ${mNet}, so ${rEq}${DETAIL_DOT}${fEq} = ${moments}`,
+    `Solving for the location: ${rEq} = ${mNet} / ${fEq} = ${formula}.`
   ];
   const noLoad = d.rect.F === 0 && d.tri.F === 0;
   // The two parts' locations are fixed by the geometry even when a part carries no force (its x in derive is null).
@@ -1268,11 +1371,18 @@ function detailComb(d, s) {
     given,
     `${fEq} = ${fRect} + ${fTri} = ${panelPar(d.rect.F, 'N')} + ${panelPar(d.tri.F, 'N')} = ${detailUnit(fmt(d.comb.F), 'N')}`
   ];
+  if (!noLoad) {
+    // the net moment, counterclockwise positive; the rounding note when the printed terms would not give the printed value
+    const { text, dir } = momentParts(d.M);
+    const exactM = panelMomentNeedsExact(d, s.peak) ? ' <span class="rnd">(worked from the unrounded locations)</span>' : '';
+    const terms = `${detailUnit(fmtFixed(xRect), 'm')}${DETAIL_DOT}${panelPar(d.rect.F, 'N')} + ${detailUnit(fmtFixed(xTri), 'm')}${DETAIL_DOT}${panelPar(d.tri.F, 'N')}`;
+    plug.push(`${mNet} = ${moments} = ${terms} = ${text}${dir ? ` (${dir})` : ''}${exactM}`);
+  }
   const notes = [];
   if (noLoad) {
-    notes.push(`There is no load, so ${fEq} = ${detailUnit('0', 'N')} and there is nothing to replace.`);
+    notes.push(`There is no load, so ${fEq} = ${detailUnit('0', 'N')}, ${mNet} = ${momentParts(0).text} and there is nothing to replace.`);
   } else if (d.comb.F === 0) {
-    notes.push(`${fEq} = ${detailUnit('0', 'N')}: the two loads leave a couple, so no single force replaces them and there is no ${rEq}.`);
+    notes.push(`${fEq} = ${detailUnit('0', 'N')}: the two loads leave a couple, a moment ${mNet} with no net force, so no single force replaces them and there is no ${rEq}.`);
   } else {
     // panelNeedsExact reads both locations, so a part with no force gets its geometric location here.
     const full = { ...d, rect: { F: d.rect.F, x: xRect }, tri: { F: d.tri.F, x: xTri } };

@@ -19,10 +19,10 @@ test('the page declares both inline markers and loads nothing external', () => {
   assert.ok(!/<link[^>]+href=/.test(template), 'the template loads an external stylesheet');
 });
 
-test('the figure viewBox is 0 0 960 560, and it is the same one layout.js and the browser harness use', () => {
-  assert.match(template, /<svg id="fig" viewBox="0 0 960 560"/);
+test('the figure viewBox is 0 0 960 548, and it is the same one layout.js and the browser harness use', () => {
+  assert.match(template, /<svg id="fig" viewBox="0 0 960 548"/);
   const want = `0 0 ${VB.w} ${VB.h}`;
-  assert.equal(want, '0 0 960 560');
+  assert.equal(want, '0 0 960 548');
   assert.ok(template.includes(`<svg id="fig" viewBox="${want}"`), 'the template viewBox differs from layout.js VB');
   // the harness is read as text, not run: its constant must say the same numbers
   const harness = readFileSync(join(here, '..', 'tools', 'browser-harness.js'), 'utf8');
@@ -69,8 +69,8 @@ test('the figure and the controls are both in the page and the calculation panel
     assert.match(m[0], /aria-pressed="(true|false)"/);
   }
   assert.equal((template.match(/class="zero-label"/g) || []).length, 2);
-  assert.equal((template.match(/<span>−200&nbsp;N\/m \(up\)<\/span>/g) || []).length, 2);
-  assert.equal((template.match(/<span>\+200&nbsp;N\/m \(down\)<\/span>/g) || []).length, 2);
+  assert.equal((template.match(/<span>−200&nbsp;N\/m \(down\)<\/span>/g) || []).length, 2);
+  assert.equal((template.match(/<span>\+200&nbsp;N\/m \(up\)<\/span>/g) || []).length, 2);
   assert.equal((template.match(/class="zero-label">0&nbsp;N\/m<\/span>/g) || []).length, 2);
   assert.ok(template.includes('Which end comes to a point (w = 0&nbsp;N/m)?'));
   assert.ok(template.includes('A 4&nbsp;m beam fixed to a wall at A'));
@@ -106,20 +106,33 @@ test('figure container: max-width 740 px and centred with auto side margins', ()
   assert.match(css, /#fig \{[^}]*width: 100%;/);
 });
 
-test('no media query turns the page into columns: no 1150 breakpoint, no 740 + 340 grid, no grid on .page', () => {
+test('no media query turns the page into columns: no 1150 breakpoint, no 740 + 340 grid, no grid on .page; the 1100 px one widens only the controls row', () => {
   assert.ok(!/1150/.test(css), 'styles.css still mentions 1150');
-  assert.ok(!/min-width: (?!700px)\d+px/.test(cssBare), 'a min-width other than 700 px');
+  assert.ok(!/min-width: (?!700px|1100px)\d+px/.test(cssBare), 'a min-width other than 700 px and 1100 px');
   assert.ok(!/grid-template-columns: minmax\(0, 740px\) 340px/.test(css), 'the 740 + 340 page grid is back');
   assert.ok(!/340px/.test(css), 'a 340 px right column is back');
   assert.ok(!/\.page[^{]*\{[^}]*display: grid/.test(css), '.page is a grid');
   assert.ok(!/\.page > /.test(css), 'a .page > child rule (the old grid placement)');
-  assert.ok(mediaBlocks.length >= 1, 'the 700 px block was not found');
-  for (const m of mediaBlocks) assert.equal(m.width, 700, `a min-width ${m.width}px media query`);
-  assert.equal(mediaBlocks.length, 1, 'exactly one min-width media query (700 px)');
+  assert.deepEqual(mediaBlocks.map(m => m.width), [700, 1100], 'exactly two min-width media queries (700 px, 1100 px)');
+  // the 1100 px block only widens the controls row: one rule, for .side, so the page never becomes columns
+  const wide = mediaBlocks.find(m => m.width === 1100);
+  assert.deepEqual([...wide.body.matchAll(/([^{}]+)\{/g)].map(m => m[1].trim()), ['.side']);
 });
 
-test('the only at-rule in styles.css is @media (min-width: 700px): no compound, max-width, min-height or other query', () => {
-  assert.deepEqual(atRules, ['@media (min-width: 700px)'], `at-rules found: ${atRules.join(' | ')}`);
+test('the only at-rules in styles.css are @media (min-width: 700px) and (min-width: 1100px): no compound, max-width, min-height or other query', () => {
+  assert.deepEqual(atRules, ['@media (min-width: 700px)', '@media (min-width: 1100px)'], `at-rules found: ${atRules.join(' | ')}`);
+});
+
+test('from 1100 px the controls row spreads to 1060 px, centred under the 740 px figure, and gives the calculation the room', () => {
+  const m = mediaBlocks.find(b => b.width === 1100);
+  assert.ok(m, 'a 1100 px breakpoint');
+  assert.match(m.body, /\.side \{[^}]*width: 1060px;[^}]*max-width: none;[^}]*margin-left: calc\(50% - 530px\);[^}]*grid-template-columns: 1fr 1\.55fr;/);
+  // centred: half of 1060 is 530; inside the window: 1060 px plus a 20 px gutter each side is the 1100 px breakpoint
+  assert.equal(1060 / 2, 530);
+  assert.ok(1060 + 2 * 20 <= 1100);
+  // the controls column keeps the ~350 px two peak buttons need (plus 26 px of padding and border)
+  assert.ok((1060 - 8) * 1 / 2.55 >= 350 + 26, 'the controls column is too narrow for the peak buttons');
+  assert.ok(!/(^|\n)\s*\.(page|fig-col)\s*\{/.test(m.body), 'the figure column and the page keep their 740 px');
 });
 
 test('the title and the From the link note sit in the same 740 px centred column as the figure and the panels', () => {

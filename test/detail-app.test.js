@@ -66,10 +66,10 @@ test('the page is titled "Distributed load on a beam: detailed calculation"', as
 
 test('page load with no parameters: defaults drawn, three blocks written, back link carries the defaults, note hidden', async () => {
   const b = await boot('');
-  assertBlocks(b, { r: 100, t: 100, peak: 'B' });
-  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=100&t=100&peak=B');
+  assertBlocks(b, { r: -100, t: -100, peak: 'B' });
+  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=-100&t=-100&peak=B');
   assert.ok(b.texts().some(t => t.includes('100 N/m')), b.texts().join('|'));
-  assert.equal(b.els['r-readout'].textContent, '100');
+  assert.equal(b.els['r-readout'].textContent, '−100');
   assert.equal(b.els['peak-b'].attrs['aria-pressed'], 'true');
   assert.equal(b.els['from-link'].hidden, true);
   assert.equal(b.els['from-link'].textContent, '');
@@ -91,9 +91,9 @@ test('moving a slider or pressing a peak button redraws the figure, all three bl
   const b = await boot('');
   b.els['r-slider'].value = '-50';
   b.els['r-slider'].fire('input');
-  assertBlocks(b, { r: -50, t: 100, peak: 'B' });
+  assertBlocks(b, { r: -50, t: -100, peak: 'B' });
   assert.ok(b.texts().some(t => t.includes('−50 N/m')), b.texts().join('|'));
-  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=-50&t=100&peak=B');
+  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=-50&t=-100&peak=B');
   b.els['t-slider'].value = '25';
   b.els['t-slider'].fire('input');
   assertBlocks(b, { r: -50, t: 25, peak: 'B' });
@@ -148,8 +148,8 @@ test('no innerHTML is ever assigned from link text', async () => {
     }
   }
   // all body markup is exactly what detailBlocks makes for the (unchanged) default state
-  assertBlocks(b, { r: 100, t: 100, peak: 'B' });
-  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=100&t=100&peak=B');
+  assertBlocks(b, { r: -100, t: -100, peak: 'B' });
+  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=-100&t=-100&peak=B');
 });
 
 test('an off-grid link shows the same adjusted/ignored note as the main page, and the blocks follow the adjusted state', async () => {
@@ -159,8 +159,8 @@ test('an off-grid link shows the same adjusted/ignored note as the main page, an
   assert.equal(b.els['from-link'].hidden, false);
   assert.ok(b.els['from-link'].textContent.includes('Adjusted: r 7 N/m'), b.els['from-link'].textContent);
   assert.ok(b.els['from-link'].textContent.includes('Ignored:'));
-  assertBlocks(b, { r: 0, t: 100, peak: 'B' });
-  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=0&t=100&peak=B');
+  assertBlocks(b, { r: 0, t: -100, peak: 'B' });
+  assert.equal(b.els['back-link'].attrs.href, 'distributed_load_beam.html?r=0&t=-100&peak=B');
 });
 
 test('an unrelated parameter leaves the note hidden', async () => {
